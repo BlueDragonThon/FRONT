@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:bluedragonthon/screens/reminder.dart';
@@ -7,11 +6,6 @@ import 'package:bluedragonthon/screens/search_subject.dart';
 import 'package:bluedragonthon/screens/search_univ.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-/*
-================================================================================
-====================== [ 원본 코드 (주석 포함) - 절대 수정 금지 ] ===============
-================================================================================
 
 class Search extends StatelessWidget {
   const Search({super.key});
@@ -249,7 +243,6 @@ class Search extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-
             // 버튼 영역: Expanded 위젯으로 세로 전체를 균등하게 채움
             Expanded(
               child: ElevatedButton(
@@ -306,9 +299,6 @@ class Search extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-
-            // 뒤로 가기 버튼 -> (원본 코드에 있던 '알리미' 대신)
-            // ------------------------
             Expanded(
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -333,10 +323,6 @@ class Search extends StatelessWidget {
   }
 }
 
-================================================================================
-====================== [ 원본 코드 (주석 포함) - 절대 수정 금지 ] ===============
-================================================================================
-*/
 
 /*
 ================================================================================
@@ -803,3 +789,4 @@ class _SearchState extends State<Search> {
     );
   }
 }
+

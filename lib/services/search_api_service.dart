@@ -86,31 +86,31 @@ class UniversityService {
   }
 
   /// 하트 토글 API 호출: 사용자 토큰을 id로 전송
-  static Future<bool> toggleHeart(int universityId, bool currentState) async {
-    final String? token = await TokenManager.getToken();
-    if (token == null) {
-      throw Exception('No token found');
-    }
-    final Uri url = Uri.parse('$baseUrl/api/college/like');
-    final body = jsonEncode({
-      "collegeId": universityId,
-    });
-
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: body,
-    );
-
-    if (response.statusCode == 200) {
-      return !currentState;
-    } else {
-      throw Exception('하트 요청 실패: ${response.statusCode}');
-    }
+static Future<bool> toggleHeart(int universityId, bool currentState) async {
+  final String? token = await TokenManager.getToken();
+  if (token == null) {
+    throw Exception('No token found');
   }
+
+  final Uri url = Uri.parse('$baseUrl/api/college/like');
+  final String body = "collegeId=${Uri.encodeQueryComponent(universityId.toString())}";
+
+  final response = await http.post(
+    url,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded', // 변경된 부분
+      'Authorization': 'Bearer $token',
+    },
+    body: body,
+  );
+
+  if (response.statusCode == 200) {
+    return !currentState;
+  } else {
+    throw Exception('하트 요청 실패: ${response.statusCode}');
+  }
+}
+
 
 static Future<List<University>> sendLocationData({
   required double acr,

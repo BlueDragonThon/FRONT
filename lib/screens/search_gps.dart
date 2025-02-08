@@ -1,13 +1,11 @@
-// search_gps.dart
 import 'package:bluedragonthon/services/api_service.dart';
-import 'package:bluedragonthon/services/search_api_service.dart';
-import 'package:bluedragonthon/utils/university_model.dart';
-import 'package:bluedragonthon/widgets/university_widgets.dart';
+import 'package:bluedragonthon/utils/token_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // 진동 효과
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:bluedragonthon/services/search_api_service.dart';
 
 class SearchGPS extends StatefulWidget {
   const SearchGPS({super.key});
@@ -20,20 +18,17 @@ class _SearchGPSState extends State<SearchGPS> {
   final TextEditingController _finalAddressController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
 
-  // 메인 뷰와 검색 뷰 전환 플래그
+  // 메인 화면과 검색 화면을 전환하는 플래그
   bool _isSearchView = false;
+  // 검색 중 표시할 인디케이터 플래그
   bool _isSearching = false;
-  bool _isLoading = false;
 
-  // 주소 검색 결과(텍스트)와 좌표는 기존 변수로 사용하고,
-  // 위치 기반 검색 결과(대학 목록)는 별도의 리스트에 저장합니다.
+  // 검색 결과 (주소 문자열)
   List<String> _searchResults = [];
+  // 각 결과에 해당하는 위도/경도 정보 (Offset.dx: latitude, dy: longitude)
   final List<Offset> _searchCoords = [];
 
-  // 위치 기반 검색 결과: University 객체 리스트
-  List<University> _locationResults = [];
-
-  // 최종 선택된 주소의 위도, 경도
+  // 최종 선택된 위치의 위도/경도
   double _selectedLat = 0.0;
   double _selectedLng = 0.0;
 
@@ -43,7 +38,7 @@ class _SearchGPSState extends State<SearchGPS> {
     _loadSavedLocation();
   }
 
-  // SharedPreferences에서 저장된 위치를 불러옵니다.
+  // SharedPreferences에서 저장된 위치(주소, 위도, 경도)를 불러옵니다.
   Future<void> _loadSavedLocation() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString('userLocation') ?? '';
@@ -54,7 +49,7 @@ class _SearchGPSState extends State<SearchGPS> {
     _selectedLng = prefs.getDouble('userLocationLng') ?? 0.0;
   }
 
-  // 선택된 위치 정보를 저장합니다.
+  // 선택된 위치 정보를 SharedPreferences에 저장합니다.
   Future<void> _saveLocation(String name, double lat, double lng) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('userLocation', name);
@@ -62,7 +57,7 @@ class _SearchGPSState extends State<SearchGPS> {
     await prefs.setDouble('userLocationLng', lng);
   }
 
-  /// 뒤로가기/닫기 버튼 처리
+  /// 검색 화면이 열려 있다면 닫고, 아니라면 이전 화면으로 돌아갑니다.
   void _onBackOrClose() {
     HapticFeedback.lightImpact();
     if (_isSearchView) {
@@ -77,8 +72,7 @@ class _SearchGPSState extends State<SearchGPS> {
     }
   }
 
-  /// "검색하기" 버튼을 누르면, 선택된 주소의 좌표를 기반으로 위치 검색 API를 호출하고,
-  /// 반환된 대학 목록을 _locationResults에 저장합니다.
+  /// "검색하기" 버튼을 누르면 선택된 주소의 위도와 경도를 백엔드로 전송합니다.
   Future<void> _sendLocationToBackend() async {
     HapticFeedback.lightImpact();
     final addr = _finalAddressController.text.trim();
@@ -87,28 +81,19 @@ class _SearchGPSState extends State<SearchGPS> {
       _showSnackBar('주소를 선택하세요.');
       return;
     }
-    setState(() {
-      _isLoading = true;
-    });
     try {
-      final results = await UniversityService.sendLocationData(
+      final response = await UniversityService.sendLocationData(
         acr: _selectedLat,
         dwn: _selectedLng,
         page: 0,
       );
-      setState(() {
-        _locationResults = results;
-      });
+      _showSnackBar('위치 전송 성공: ${response.toString()}');
     } catch (e) {
       _showSnackBar('위치 전송 실패: $e');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
-  /// 검색 뷰 열기
+  /// 검색 뷰를 열기 위해 플래그를 변경합니다.
   void _openSearchView() {
     HapticFeedback.lightImpact();
     setState(() {
@@ -119,7 +104,7 @@ class _SearchGPSState extends State<SearchGPS> {
     });
   }
 
-  /// 입력한 검색어로 주소 검색 (geocoding 이용)
+  /// 입력한 검색어로 주소 검색(여러 결과 및 각 위/경도 정보)을 진행합니다.
   Future<void> _onSearch() async {
     HapticFeedback.lightImpact();
     final query = _searchController.text.trim();
@@ -133,6 +118,7 @@ class _SearchGPSState extends State<SearchGPS> {
       _searchResults.clear();
       _searchCoords.clear();
     });
+
     try {
       final locations = await locationFromAddress(query);
       if (locations.isEmpty) {
@@ -141,10 +127,14 @@ class _SearchGPSState extends State<SearchGPS> {
         setState(() => _isSearching = false);
         return;
       }
+
       final List<String> foundNames = [];
       final List<Offset> foundCoords = [];
+
+      // geocoding 결과로부터 placemark 정보를 가져와 주소 문자열로 변환합니다.
       for (final loc in locations) {
-        final placemarks = await placemarkFromCoordinates(loc.latitude, loc.longitude);
+        final placemarks =
+            await placemarkFromCoordinates(loc.latitude, loc.longitude);
         for (final place in placemarks) {
           final addr = _formatPlacemark(place);
           if (addr.isNotEmpty && !foundNames.contains(addr)) {
@@ -153,12 +143,14 @@ class _SearchGPSState extends State<SearchGPS> {
           }
         }
       }
+
       if (foundNames.isEmpty) {
         HapticFeedback.mediumImpact();
         _showSnackBar('검색 결과가 없습니다.');
       } else {
         HapticFeedback.lightImpact();
       }
+
       setState(() {
         _searchResults = foundNames;
         _searchCoords.addAll(foundCoords);
@@ -171,7 +163,7 @@ class _SearchGPSState extends State<SearchGPS> {
     }
   }
 
-  /// GPS 기반 주소 검색
+  /// GPS를 이용하여 현재 위치 기반으로 주소 검색을 진행합니다.
   Future<void> _onLocationBasedSearch() async {
     HapticFeedback.lightImpact();
     setState(() {
@@ -179,6 +171,7 @@ class _SearchGPSState extends State<SearchGPS> {
       _searchResults.clear();
       _searchCoords.clear();
     });
+
     try {
       LocationPermission perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
@@ -194,12 +187,16 @@ class _SearchGPSState extends State<SearchGPS> {
         setState(() => _isSearching = false);
         return;
       }
+
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-      final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
+      final placemarks =
+          await placemarkFromCoordinates(pos.latitude, pos.longitude);
+
       final List<String> foundNames = [];
       final List<Offset> foundCoords = [];
+
       for (final p in placemarks) {
         final addr = _formatPlacemark(p);
         if (addr.isNotEmpty && !foundNames.contains(addr)) {
@@ -207,6 +204,7 @@ class _SearchGPSState extends State<SearchGPS> {
           foundCoords.add(Offset(pos.latitude, pos.longitude));
         }
       }
+
       if (foundNames.isEmpty) {
         HapticFeedback.mediumImpact();
         _showSnackBar('현재 위치 검색 결과가 없습니다.');
@@ -225,7 +223,7 @@ class _SearchGPSState extends State<SearchGPS> {
     }
   }
 
-  /// 검색 결과에서 하나 선택하면, 해당 주소와 좌표를 메인 화면에 반영합니다.
+  /// 검색 결과의 특정 인덱스를 선택하면 메인 화면의 주소 필드와 위/경도 값이 업데이트됩니다.
   void _onSelectResultIndex(int index) {
     HapticFeedback.lightImpact();
     setState(() {
@@ -236,7 +234,7 @@ class _SearchGPSState extends State<SearchGPS> {
     });
   }
 
-  /// Placemark를 읽기 쉬운 문자열로 변환
+  /// Placemark 객체를 받아 적절한 주소 문자열로 변환합니다.
   String _formatPlacemark(Placemark place) {
     final parts = [
       place.country ?? '',
@@ -268,7 +266,7 @@ class _SearchGPSState extends State<SearchGPS> {
       body: SafeArea(
         child: Stack(
           children: [
-            // 메인 뷰와 검색 뷰 전환
+            // 메인 뷰와 검색 뷰를 AnimatedSwitcher로 전환합니다.
             GestureDetector(
               onTap: () => FocusScope.of(context).unfocus(),
               behavior: HitTestBehavior.translucent,
@@ -277,7 +275,7 @@ class _SearchGPSState extends State<SearchGPS> {
                 child: _isSearchView ? _buildSearchView() : _buildMainView(),
               ),
             ),
-            // 왼쪽 상단 뒤로가기/닫기 아이콘
+            // 왼쪽 상단의 뒤로가기/닫기 아이콘
             Positioned(
               top: 5,
               left: 10,
@@ -296,18 +294,18 @@ class _SearchGPSState extends State<SearchGPS> {
     );
   }
 
-  /// 메인 뷰: 선택된 주소, GPS 아이콘, "검색하기" 버튼 및 (위치 검색 결과가 있을 경우) 결과 목록 표시
+  /// 메인 뷰: 선택된 주소(읽기 전용 텍스트필드)와 검색, "검색하기" 버튼 구성
   Widget _buildMainView() {
     return Container(
       key: const ValueKey('MainView'),
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      child: SingleChildScrollView(
+      child: Center(
         child: Column(
           children: [
             const Text(
               '위치로 대학 찾기',
-              style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 48),
             Row(
@@ -364,6 +362,7 @@ class _SearchGPSState extends State<SearchGPS> {
               ],
             ),
             const SizedBox(height: 20),
+            // "검색하기" 버튼이 눌리면 선택된 주소의 위/경도 정보를 백엔드로 전송합니다.
             ElevatedButton(
               onPressed: _sendLocationToBackend,
               style: ElevatedButton.styleFrom(
@@ -377,29 +376,13 @@ class _SearchGPSState extends State<SearchGPS> {
               ),
               child: const Text("검색하기"),
             ),
-            const SizedBox(height: 20),
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator())
-            else if (_locationResults.isNotEmpty)
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _locationResults.length,
-                itemBuilder: (context, index) {
-                  final univ = _locationResults[index];
-                  return UniversityListItem(
-                    university: univ,
-                    onToggleHeart: () =>UniversityService.toggleHeart(univ.id, univ.isHeart),
-                  );
-                },
-              ),
           ],
         ),
       ),
     );
   }
 
-  /// 검색 뷰: 검색어 입력, 주소 검색, GPS 기반 검색, 검색 결과 목록 (텍스트)
+  /// 검색 뷰: 검색어 입력, 주소 검색, GPS 기반 검색, 그리고 검색 결과 목록
   Widget _buildSearchView() {
     return Container(
       key: const ValueKey('SearchView'),
@@ -482,27 +465,31 @@ class _SearchGPSState extends State<SearchGPS> {
             ),
           ),
           const SizedBox(height: 16),
-          if (_isSearching)
-            const Center(child: CircularProgressIndicator())
-          else if (_searchResults.isEmpty)
-            const Center(
-              child: Text('검색 결과가 없습니다.', style: TextStyle(fontSize: 18)),
-            )
-          else
-            Expanded(
-              child: ListView.builder(
-                itemCount: _searchResults.length,
-                itemBuilder: (context, idx) {
-                  final item = _searchResults[idx];
-                  return ListTile(
-                    title: Text(item, style: const TextStyle(fontSize: 20)),
-                    onTap: () => _onSelectResultIndex(idx),
-                  );
-                },
-              ),
-            ),
+          Expanded(child: _buildSearchResults()),
         ],
       ),
+    );
+  }
+
+  /// 검색 결과 목록 (리스트뷰). 각 결과를 선택하면 _onSelectResultIndex가 호출됩니다.
+  Widget _buildSearchResults() {
+    if (_isSearching) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_searchResults.isEmpty) {
+      return const Center(
+        child: Text('검색 결과가 없습니다.', style: TextStyle(fontSize: 18)),
+      );
+    }
+    return ListView.builder(
+      itemCount: _searchResults.length,
+      itemBuilder: (context, idx) {
+        final item = _searchResults[idx];
+        return ListTile(
+          title: Text(item, style: const TextStyle(fontSize: 20)),
+          onTap: () => _onSelectResultIndex(idx),
+        );
+      },
     );
   }
 }

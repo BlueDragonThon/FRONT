@@ -1,3 +1,4 @@
+import 'package:bluedragonthon/screens/likes_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -83,8 +84,6 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
       // 커뮤니티
         break;
       case 3:
-      // 나의 관심 대학
-        break;
     }
   }
 
