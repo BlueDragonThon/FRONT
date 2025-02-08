@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:bluedragonthon/services/api_service.dart';
 import 'package:bluedragonthon/utils/token_manager.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart'; // 추가
 
 class MobileAlertScreen extends StatefulWidget {
   const MobileAlertScreen({Key? key}) : super(key: key);
@@ -12,6 +13,9 @@ class MobileAlertScreen extends StatefulWidget {
 }
 
 class _MobileAlertScreenState extends State<MobileAlertScreen> {
+  // --------------------------
+  // "큰 글자 모드" 여부
+  // --------------------------
   bool _isLargeText = false;
 
   List<NotificationItem> _notifications = [];
@@ -21,7 +25,26 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
   @override
   void initState() {
     super.initState();
+    _loadLargeTextSetting();
     _fetchNotifications();
+  }
+
+  // --------------------------
+  // SharedPreferences에서 "큰 글자 모드" 불러오기
+  // --------------------------
+  Future<void> _loadLargeTextSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isLargeText = prefs.getBool('isLargeText') ?? false;
+    });
+  }
+
+  // --------------------------
+  // "큰 글자 모드" 저장
+  // --------------------------
+  Future<void> _saveLargeTextSetting(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLargeText', value);
   }
 
   Future<void> _fetchNotifications() async {
@@ -97,6 +120,8 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
                       setState(() {
                         _isLargeText = value;
                       });
+                      // 스위치 상태가 바뀔 때 SharedPreferences에 저장
+                      _saveLargeTextSetting(value);
                     },
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: Colors.grey,

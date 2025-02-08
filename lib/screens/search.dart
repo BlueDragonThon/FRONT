@@ -8,6 +8,7 @@ import 'package:bluedragonthon/screens/search_univ.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart'; // <-- HapticFeedback을 사용하려면 추가
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Search extends StatefulWidget {
   const Search({Key? key}) : super(key: key);
@@ -17,8 +18,28 @@ class Search extends StatefulWidget {
 }
 
 class _SearchState extends State<Search> {
-  /// "큰 글자 모드" 여부
+  // -------------------------------------------------
+  // "큰 글자 모드" 여부
+  // -------------------------------------------------
   bool _isLargeText = false;
+
+  // -------------------------------------------------
+  // 공유 함수: "큰 글자 모드" 로드
+  // -------------------------------------------------
+  Future<void> _loadLargeTextSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isLargeText = prefs.getBool('isLargeText') ?? false;
+    });
+  }
+
+  // -------------------------------------------------
+  // 공유 함수: "큰 글자 모드" 저장
+  // -------------------------------------------------
+  Future<void> _saveLargeTextSetting(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLargeText', value);
+  }
 
   /// 사용자 슬라이드용 PageController (가로 이동)
   late PageController _pageController;
