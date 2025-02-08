@@ -62,6 +62,9 @@ class ApiService {
       body: jsonEncode(body),
     );
 
+    print(response.statusCode);
+    print(jsonDecode(response.body));
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       return SignupResponse.fromJson(data);
