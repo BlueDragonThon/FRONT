@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/mobile_splash_screen.dart';
@@ -10,11 +11,12 @@ import 'screens/mobile_main_screen.dart';
 void main() async {
   // 플러그인(SharedPreferences 등) 사용 전 반드시 초기화
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   static const Color primaryColor = Color(0xFFB3A3EC);
 

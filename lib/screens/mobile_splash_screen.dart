@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'mobile_name_input_screen.dart'; // 아래 코드와 연결
 
 class MobileSplashScreen extends StatefulWidget {
-  const MobileSplashScreen({Key? key}) : super(key: key);
+  const MobileSplashScreen({super.key});
 
   @override
   State<MobileSplashScreen> createState() => _MobileSplashScreenState();
@@ -121,7 +121,7 @@ class _MobileSplashScreenState extends State<MobileSplashScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    '여러분들의 원대한 교육 여정',
+                    '여러분의 원대한 교육 여정',
                     style: TextStyle(
                       fontSize: 25,
                       fontWeight: FontWeight.w600,

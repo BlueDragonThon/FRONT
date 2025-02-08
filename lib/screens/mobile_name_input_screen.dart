@@ -1,10 +1,11 @@
+import 'package:bluedragonthon/screens/search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // 진동 사용시 필요
 import 'package:shared_preferences/shared_preferences.dart';
 import 'mobile_age_select_screen.dart'; // 나이 화면
 
 class MobileNameInputScreen extends StatefulWidget {
-  const MobileNameInputScreen({Key? key}) : super(key: key);
+  const MobileNameInputScreen({super.key});
 
   @override
   State<MobileNameInputScreen> createState() => _MobileNameInputScreenState();
@@ -73,6 +74,14 @@ class _MobileNameInputScreenState extends State<MobileNameInputScreen> {
     _loadName();
   }
 
+    // 화면 간 이동을 위한 함수  // 테스트용, 추후 삭제하면 됨.
+  void _navigateTo(BuildContext context, Widget screen) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => screen),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -90,6 +99,7 @@ class _MobileNameInputScreenState extends State<MobileNameInputScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                ElevatedButton(onPressed: () => _navigateTo(context, const Search()), child: Text("임시 검색 페이지")),
                 const Text(
                   '이름을 입력해주세요',
                   style: TextStyle(
