@@ -34,7 +34,7 @@ class _SearchSubjectState extends State<SearchSubject> {
     });
 
     try {
-      final results = await UniversityService.searchUniversity(searchText, '/api/collage');
+      final results = await UniversityService.searchProgram(searchText, '/api/collage/program');
       setState(() {
         _searchResults = results;
       });
