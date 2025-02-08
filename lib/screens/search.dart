@@ -7,12 +7,11 @@ import 'package:bluedragonthon/screens/search_subject.dart';
 import 'package:bluedragonthon/screens/search_univ.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart'; // <-- HapticFeedback을 사용하려면 추가
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math'; // 랜덤 뽑기용
+import 'package:bluedragonthon/services/api_service.dart';
 
-/*
-================================================================================
-====================== [ 새로운 변경 UI 적용된 Search ] =========================
-================================================================================
-*/
 class Search extends StatefulWidget {
   const Search({super.key});
 
@@ -21,8 +20,28 @@ class Search extends StatefulWidget {
 }
 
 class _SearchState extends State<Search> {
-  /// "큰 글자 모드" 여부
+  // -------------------------------------------------
+  // "큰 글자 모드" 여부
+  // -------------------------------------------------
   bool _isLargeText = false;
+
+  // -------------------------------------------------
+  // 공유 함수: "큰 글자 모드" 로드
+  // -------------------------------------------------
+  Future<void> _loadLargeTextSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isLargeText = prefs.getBool('isLargeText') ?? false;
+    });
+  }
+
+  // -------------------------------------------------
+  // 공유 함수: "큰 글자 모드" 저장
+  // -------------------------------------------------
+  Future<void> _saveLargeTextSetting(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLargeText', value);
+  }
 
   /// 사용자 슬라이드용 PageController (가로 이동)
   late PageController _pageController;
@@ -34,36 +53,62 @@ class _SearchState extends State<Search> {
   int _currentPage = 0;
 
   /// 예시 데이터 (실제로는 fetchCollegeInfo() 결과를 받아올 수 있음)
-  final List<Map<String, String>> _collegeList = [
-    {
-      'collegeName': '중앙대학교',
-      'subjectName': '소프트웨어학부',
-      'phone': '010-2797-1090',
-      'email': 'sy020527@naver.com',
-      'website': 'https://www.cau.ac.kr',
-    },
-    {
-      'collegeName': '서울대학교',
-      'subjectName': '컴퓨터공학부',
-      'phone': '02-880-1234',
-      'email': 'info@snu.ac.kr',
-      'website': 'https://www.snu.ac.kr',
-    },
-    {
-      'collegeName': '카이스트',
-      'subjectName': '전산학부',
-      'phone': '042-350-1234',
-      'email': 'info@kaist.ac.kr',
-      'website': 'https://www.kaist.ac.kr',
-    },
-  ];
+  List<Map<String, String>> _collegeList = [];
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    _fetchCollegeData(); // <-- API에서 데이터 불러오기
     // 초기 자동 슬라이드 시작
     _startAutoSlide();
+  }
+
+  /// 서버에서 데이터 불러오는 함수
+  Future<void> _fetchCollegeData() async {
+    try {
+      // 1) API 호출
+      final response = await ApiService.searchCollege(page: 0);
+      final allItems = response.result.result; // List<LikeUnivItem>
+
+      if (allItems.isEmpty) {
+        // 빈 리스트라면 처리
+        print('No colleges found');
+        return;
+      }
+
+      // 2) 랜덤으로 4개만 추출
+      final random = Random();
+      final temp = [...allItems]; // 복사본
+      final chosen = <LikeUnivItem>[];
+
+      // 최대 4개, temp가 비지 않는 동안
+      for (int i = 0; i < 4 && temp.isNotEmpty; i++) {
+        final idx = random.nextInt(temp.length);
+        chosen.add(temp.removeAt(idx));
+      }
+
+      // 3) UI에서 쓰기 편하도록 Map<String,String> 변환
+      //    (프로그램(program) 등 다른 필드도 원하시면 적절히 가공)
+      final mapped = chosen.map((item) {
+        return {
+          'collegeName': item.name,
+          'subjectName': item.program.isNotEmpty
+              ? item.program.join(', ')
+              : '정보 없음',
+          'phone': item.contactInfo,
+          'email': item.headmaster,
+          'website': item.address,
+        };
+      }).toList();
+
+      // 4) 상태 갱신
+      setState(() {
+        _collegeList = mapped;
+      });
+    } catch (e) {
+      print('Error fetching colleges: $e');
+    }
   }
 
   @override
@@ -119,6 +164,8 @@ class _SearchState extends State<Search> {
 
   /// 화면 이동
   void _navigateTo(BuildContext context, Widget screen) {
+    // 버튼 클릭 시 진동
+    HapticFeedback.lightImpact();
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => screen),
@@ -150,8 +197,14 @@ class _SearchState extends State<Search> {
           decoration:
               onTap != null ? TextDecoration.underline : TextDecoration.none,
         ),
+        // onTap 내부에서도 진동 발생
         child: InkWell(
-          onTap: onTap,
+          onTap: onTap != null
+              ? () {
+            HapticFeedback.lightImpact(); // 버튼 클릭 시 진동
+            onTap();
+          }
+              : null,
           child: Text(content),
         ),
       );
@@ -239,6 +292,7 @@ class _SearchState extends State<Search> {
                       Icons.email,
                       "이메일",
                       info['email'] ?? '',
+                      // 여기는 onTap 없음
                     ),
                   ),
                 ],
@@ -271,7 +325,11 @@ class _SearchState extends State<Search> {
     required VoidCallback onTap,
   }) {
     return InkWell(
-      onTap: onTap,
+      // 버튼 클릭 시 진동
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(24),
@@ -361,6 +419,8 @@ class _SearchState extends State<Search> {
                       Switch(
                         value: _isLargeText,
                         onChanged: (value) {
+                          // 스위치 변경 시 진동
+                          HapticFeedback.lightImpact();
                           setState(() {
                             _isLargeText = value;
                           });
