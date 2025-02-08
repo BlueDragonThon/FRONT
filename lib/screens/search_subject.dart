@@ -3,7 +3,6 @@ import 'package:bluedragonthon/utils/university_model.dart';
 import 'package:bluedragonthon/widgets/university_widgets.dart';
 import 'package:flutter/material.dart';
 
-
 class SearchSubject extends StatefulWidget {
   const SearchSubject({super.key});
 
@@ -34,7 +33,8 @@ class _SearchSubjectState extends State<SearchSubject> {
     });
 
     try {
-      final results = await UniversityService.searchProgram(searchText, '/api/collage/program');
+      final results = await UniversityService.searchProgram(
+          searchText, '/api/college/program');
       setState(() {
         _searchResults = results;
       });
@@ -51,7 +51,8 @@ class _SearchSubjectState extends State<SearchSubject> {
 
   Future<void> _toggleHeart(University univ) async {
     try {
-      final newState = await UniversityService.toggleHeart(univ.id, univ.isHeart);
+      final newState =
+          await UniversityService.toggleHeart(univ.id, univ.isHeart);
       setState(() {
         _searchResults = _searchResults.map((u) {
           if (u.id == univ.id) {
@@ -76,11 +77,8 @@ class _SearchSubjectState extends State<SearchSubject> {
   Widget build(BuildContext context) {
     // 기존의 UI 구성...
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("과목 검색"),
-      ),
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
         child: Column(
           children: [
             const Text(
