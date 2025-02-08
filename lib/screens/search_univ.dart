@@ -14,7 +14,7 @@ class SearchUniv extends StatefulWidget {
 class _SearchUnivState extends State<SearchUniv> {
   final TextEditingController _nameController = TextEditingController();
 
-  bool _searched = false;         // 검색 버튼 눌렀는지 여부
+  bool _searched = false;         // 검색 버튼을 눌렀는지 여부
   bool _isLoading = false;        // 로딩 상태
   String? _error;                 // 에러 메시지
   List<University> _searchResults = [];
@@ -77,7 +77,8 @@ class _SearchUnivState extends State<SearchUniv> {
   Future<void> _toggleHeart(University univ) async {
     print('토글 요청: 대학 ID = ${univ.id}');
     try {
-      final newState = await UniversityService.toggleHeart(univ.id, univ.isHeart);
+      final newState =
+      await UniversityService.toggleHeart(univ.id, univ.isHeart);
       setState(() {
         // 현재 리스트 갱신
         _searchResults = _searchResults.map((u) {
@@ -111,7 +112,7 @@ class _SearchUnivState extends State<SearchUniv> {
             // 바깥 터치 시 포커스 해제
             GestureDetector(
               onTap: () => FocusScope.of(context).unfocus(),
-              behavior: HitTestBehavior.deferToChild,
+              behavior: HitTestBehavior.opaque, // 수정: 어느 영역이든 터치 수용
               child: _buildBody(),
             ),
 
@@ -140,9 +141,7 @@ class _SearchUnivState extends State<SearchUniv> {
       children: [
         // 결과 리스트 (아래 쪽)
         Positioned.fill(
-          top: 200,
-          // 검색 바가 아래 코드에서 top=200 이하 영역을 차지하므로,
-          // 리스트는 그 아래부터 채움
+          top: 180,
           child: _buildResultWidget(),
         ),
 
@@ -154,7 +153,7 @@ class _SearchUnivState extends State<SearchUniv> {
           left: 0,
           right: 0,
           // 검색 전이면 대략 화면 중간, 검색 후엔 top=100
-          top: _searched ? 100 : MediaQuery.of(context).size.height * 0.3,
+          top: _searched ? 100 : MediaQuery.of(context).size.height * 0.33,
           child: _buildSearchBar(),
         ),
       ],
@@ -178,14 +177,15 @@ class _SearchUnivState extends State<SearchUniv> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(
-              width: 300,
+              width: 280,
               height: 60,
               child: TextField(
                 controller: _nameController,
                 style: const TextStyle(fontSize: 25),
                 decoration: InputDecoration(
-                  hintText: '원하는 대학교를 검색해보세요',
-                  hintStyle: const TextStyle(color: Colors.black54, fontSize: 20),
+                  hintText: '대학교를 검색해보세요!',
+                  hintStyle:
+                  const TextStyle(color: Colors.black54, fontSize: 23),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(32.0),
                     borderSide: const BorderSide(width: 2, color: Colors.grey),
@@ -197,8 +197,10 @@ class _SearchUnivState extends State<SearchUniv> {
                       color: Theme.of(context).primaryColor,
                     ),
                   ),
-                  contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
                 ),
               ),
             ),
@@ -217,7 +219,7 @@ class _SearchUnivState extends State<SearchUniv> {
                 ),
                 child: const Text(
                   '검색',
-                  style: TextStyle(fontSize: 20, color: Colors.white),
+                  style: TextStyle(fontSize: 23, color: Colors.white),
                 ),
               ),
             ),
@@ -234,14 +236,20 @@ class _SearchUnivState extends State<SearchUniv> {
     }
     if (_error != null) {
       return Center(
-        child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 20)),
+        child: Text(
+          _error!,
+          style: const TextStyle(color: Colors.red, fontSize: 20),
+        ),
       );
     }
-    if (_searchResults.isEmpty) {
-      // 검색 전이거나 결과가 없을 때
-      return const SizedBox.shrink();
-      // 혹은 "검색 결과가 없습니다." 표시
-      // return const Center(child: Text('검색 결과가 없습니다.'));
+    // 검색을 했지만 결과가 비었을 때
+    if (_searched && _searchResults.isEmpty) {
+      return const Center(
+        child: Text(
+          '검색 결과가 없습니다.',
+          style: TextStyle(fontSize: 20),
+        ),
+      );
     }
 
     // 실제 결과 리스트
@@ -249,9 +257,6 @@ class _SearchUnivState extends State<SearchUniv> {
       itemCount: _searchResults.length,
       itemBuilder: (context, index) {
         final univ = _searchResults[index];
-
-        // == 여기서 '이중박스'를 만들지 않고,
-        //    UniversityListItem 내에서만 Neumorphism(단일 박스) 적용
         return UniversityListItem(
           university: univ,
           onToggleHeart: () => _toggleHeart(univ),

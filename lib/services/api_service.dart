@@ -465,4 +465,42 @@ class ApiService {
       throw Exception('Failed to search college: ${response.statusCode}');
     }
   }
+
+  static Future<LikeUnivListResponse> distanceSearchCollege({
+    required double acr, // 위도
+    required double dwn, // 경도
+    required int page,
+  }) async {
+    final token = await TokenManager.getToken();
+    if (token == null) {
+      throw Exception('No Token found');
+    }
+
+    final body = {
+      "acr": acr,
+      "dwn": dwn,
+    };
+
+    final url = Uri.parse('$baseUrl/api/college/distance');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode(body),
+    );
+
+    final decodedBody = utf8.decode(response.bodyBytes);
+    if (response.statusCode == 200) {
+      final jsonBody = jsonDecode(decodedBody) as Map<String, dynamic>;
+      if (jsonBody['isSuccess'] == true) {
+        return LikeUnivListResponse.fromJson(jsonBody);
+      } else {
+        throw Exception(jsonBody['message'] ?? 'Failed to distance-search college');
+      }
+    } else {
+      throw Exception('Failed to distance-search college: ${response.statusCode}');
+    }
+  }
 }
