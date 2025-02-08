@@ -84,7 +84,7 @@ class Search extends StatelessWidget {
     return Scaffold(
       body: Padding(
         padding:
-            const EdgeInsets.only(top: 40, bottom: 20, left: 10, right: 10),
+            const EdgeInsets.only(top: 30, bottom: 20, left: 10, right: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -252,7 +252,7 @@ class Search extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20)),
                 ),
                 onPressed: () =>
-                    _navigateTo(context, const CollegeReminderScreen()),
+                    _navigateTo(context, const SearchUniv()),
                 child: const Text(
                   '대학 이름 찾기',
                   style: TextStyle(
