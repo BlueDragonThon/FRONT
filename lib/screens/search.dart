@@ -354,14 +354,14 @@ class _SearchState extends State<Search> {
   /// "큰 글자 모드" 여부
   bool _isLargeText = false;
 
-  /// 사용자 슬라이드용 PageController (자동 슬라이드 제거)
+  /// 사용자 슬라이드용 PageController (가로 이동)
   late PageController _pageController;
 
-  /// 가장 긴 카드의 높이를 측정하여 고정하기 위한 변수
-  double _maxCardHeight = 0.0;
+  /// 자동 슬라이드 기능을 위한 Timer
+  Timer? _autoSlideTimer;
 
-  /// 카드별 GlobalKey 리스트
-  final List<GlobalKey> _cardKeys = [];
+  /// 현재 페이지 인덱스
+  int _currentPage = 0;
 
   /// 예시 데이터 (실제로는 fetchCollegeInfo() 결과를 받아올 수 있음)
   final List<Map<String, String>> _collegeList = [
@@ -392,37 +392,44 @@ class _SearchState extends State<Search> {
   void initState() {
     super.initState();
     _pageController = PageController();
-    // 각 카드마다 key를 생성
-    _cardKeys.addAll(List.generate(_collegeList.length, (_) => GlobalKey()));
-    // 초기에 프레임이 그려진 뒤 최대 높이를 측정
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateMaxHeight());
+    // 초기 자동 슬라이드 시작
+    _startAutoSlide();
   }
 
-  /// 레이아웃 변동 시(큰 글자 모드 on/off 등) 다시 측정
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateMaxHeight());
+  void dispose() {
+    // Timer 해제
+    _stopAutoSlide();
+    _pageController.dispose();
+    super.dispose();
   }
 
-  /// 모든 카드(GlobalKey) 높이를 측정하여 가장 긴 높이를 찾음
-  void _updateMaxHeight() {
-    double maxH = 0.0;
-    for (var key in _cardKeys) {
-      final ctx = key.currentContext;
-      if (ctx != null) {
-        final box = ctx.findRenderObject() as RenderBox?;
-        if (box != null) {
-          final h = box.size.height;
-          if (h > maxH) maxH = h;
-        }
-      }
+  /// 5초 간격으로 자동 슬라이드 시작
+  void _startAutoSlide() {
+    // 먼저 타이머가 있다면 해제
+    _stopAutoSlide();
+    _autoSlideTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      // 다음 페이지로 이동
+      _goToNextPage();
+    });
+  }
+
+  /// 자동 슬라이드 정지
+  void _stopAutoSlide() {
+    if (_autoSlideTimer != null) {
+      _autoSlideTimer!.cancel();
+      _autoSlideTimer = null;
     }
-    if (maxH != _maxCardHeight) {
-      setState(() {
-        _maxCardHeight = maxH;
-      });
-    }
+  }
+
+  /// 다음 페이지로 이동 (마지막 페이지에서 다시 첫 페이지로)
+  void _goToNextPage() {
+    final nextPage = (_currentPage + 1) % _collegeList.length;
+    _pageController.animateToPage(
+      nextPage,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
   }
 
   /// 뒤로 가기
@@ -437,60 +444,6 @@ class _SearchState extends State<Search> {
     }
   }
 
-  /// 원본 _infoRow 스타일 + 큰 글자 모션
-  Widget _infoRow(IconData icon, String label, String content,
-      {VoidCallback? onTap}) {
-    // 폰트 크기 설정
-    final double labelSize = _isLargeText ? 26 : 20;
-    final double contentSize = _isLargeText ? 22 : 18;
-
-    // label에 애니메이션
-    final labelWidget = AnimatedDefaultTextStyle(
-      duration: const Duration(milliseconds: 250),
-      style: TextStyle(
-        fontSize: labelSize,
-        fontWeight: FontWeight.bold,
-        color: Colors.black,
-      ),
-      child: Text(label),
-    );
-
-    // content에 애니메이션
-    final contentWidget = AnimatedDefaultTextStyle(
-      duration: const Duration(milliseconds: 250),
-      style: TextStyle(
-        fontSize: contentSize,
-        color: onTap != null ? Colors.blue : Colors.black87,
-        decoration: onTap != null ? TextDecoration.underline : TextDecoration.none,
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: Text(content),
-      ),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: labelSize + 4, color: Colors.grey[700]),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                labelWidget,
-                const SizedBox(height: 4),
-                contentWidget,
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// 큰 글자 모드에서 버튼 폰트 크기
   double get _buttonFontSize => _isLargeText ? 36 : 30;
 
@@ -502,153 +455,64 @@ class _SearchState extends State<Search> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+  /// 카드 내부 내용만 (대학 정보 표출)
+  Widget _buildCollegeContent(Map<String, String> info) {
+    final double labelSize = _isLargeText ? 26 : 20;
+    final double contentSize = _isLargeText ? 22 : 18;
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          // 배경 그라데이션
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFE3E5ED),
-                  Color(0xFFDADCE2),
-                ],
-              ),
-            ),
-          ),
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 18.0),
+    Widget infoRow(IconData icon, String label, String content,
+        {VoidCallback? onTap}) {
+      final labelWidget = AnimatedDefaultTextStyle(
+        duration: const Duration(milliseconds: 250),
+        style: TextStyle(
+          fontSize: labelSize,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+        ),
+        child: Text(label),
+      );
+
+      final contentWidget = AnimatedDefaultTextStyle(
+        duration: const Duration(milliseconds: 250),
+        style: TextStyle(
+          fontSize: contentSize,
+          color: onTap != null ? Colors.blue : Colors.black87,
+          decoration:
+          onTap != null ? TextDecoration.underline : TextDecoration.none,
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Text(content),
+        ),
+      );
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: labelSize + 4, color: Colors.grey[700]),
+            const SizedBox(width: 10),
+            Expanded(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 12),
-                  // 오른쪽 상단 '큰 글자' 스위치
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      AnimatedDefaultTextStyle(
-                        duration: const Duration(milliseconds: 300),
-                        style: TextStyle(
-                          fontSize: _isLargeText ? 28 : 23,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                        child: const Text('큰 글자'),
-                      ),
-                      const SizedBox(width: 3),
-                      Switch(
-                        value: _isLargeText,
-                        onChanged: (value) {
-                          setState(() {
-                            _isLargeText = value;
-                          });
-                        },
-                        inactiveThumbColor: Colors.white,
-                        inactiveTrackColor: Colors.grey,
-                        activeColor: Colors.white,
-                        activeTrackColor: Colors.blueAccent,
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                  ),
-                  // 둥근 사각형 컨테이너 (카드 슬라이드 높이 = 가장 긴 카드 기준)
-                  SizedBox(
-                    height: _maxCardHeight > 0 ? (_maxCardHeight + 65) : 280,
-                    // 초기값 200 정도 임시 설정
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        color: Colors.white.withOpacity(0.3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            offset: const Offset(4, 4),
-                            blurRadius: 8,
-                          ),
-                          BoxShadow(
-                            color: Colors.white.withOpacity(0.7),
-                            offset: const Offset(-4, -4),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: PageView.builder(
-                          controller: _pageController,
-                          physics: const PageScrollPhysics(), // 수동 슬라이드
-                          itemCount: _collegeList.length,
-                          itemBuilder: (context, index) {
-                            return _buildCollegeCard(
-                                index, _collegeList[index]);
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  // 2 x 2 버튼 (뉴모피즘)
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 20,
-                    crossAxisSpacing: 20,
-                    childAspectRatio: 0.85,
-                    children: [
-                      _buildNeumorphicButton(
-                        text: '대학\n이름 찾기',
-                        icon: Icons.school,
-                        color: const Color(0xFFFFC8D0),
-                        onTap: () => _navigateTo(context, const SearchUniv()),
-                      ),
-                      _buildNeumorphicButton(
-                        text: '과목\n이름 찾기',
-                        icon: Icons.menu_book,
-                        color: const Color(0xFFFFF5B3),
-                        onTap: () => _navigateTo(context, const SearchSubject()),
-                      ),
-                      _buildNeumorphicButton(
-                        text: '위치로\n찾기',
-                        icon: Icons.location_on,
-                        color: const Color(0xFFB7FFBF),
-                        onTap: () => _navigateTo(context, const SearchGPS()),
-                      ),
-                      _buildNeumorphicButton(
-                        text: '뒤로 가기',
-                        icon: Icons.arrow_back,
-                        color: const Color(0xFFB7EEFF),
-                        onTap: _goBack,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
+                  labelWidget,
+                  const SizedBox(height: 4),
+                  contentWidget,
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+      );
+    }
 
-  /// 단일 카드 UI (추천 대학 + 정보)
-  /// index로부터 해당 카드에 GlobalKey를 부여
-  Widget _buildCollegeCard(int index, Map<String, String> info) {
-    return Container(
-      key: _cardKeys[index],
-      color: Colors.transparent,
+    return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center, // 타이틀 중앙
         children: [
-          // (1) '추천 대학'은 상단 중앙
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
             style: TextStyle(
@@ -659,15 +523,14 @@ class _SearchState extends State<Search> {
             child: const Text("추천 대학", textAlign: TextAlign.center),
           ),
           const SizedBox(height: 10),
-          // (2) 나머지 항목은 상단 정렬(좌측)
-          // wrap with Expanded or Flexible if needed, but we can also just keep a Column
+          // 나머지 항목은 상단 정렬(좌측)
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Expanded(
-                    child: _infoRow(
+                    child: infoRow(
                       Icons.school,
                       "대학명",
                       info['collegeName'] ?? '',
@@ -675,7 +538,7 @@ class _SearchState extends State<Search> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: _infoRow(
+                    child: infoRow(
                       Icons.book,
                       "학부명",
                       info['subjectName'] ?? '',
@@ -687,7 +550,7 @@ class _SearchState extends State<Search> {
               Row(
                 children: [
                   Expanded(
-                    child: _infoRow(
+                    child: infoRow(
                       Icons.phone,
                       "전화",
                       info['phone'] ?? '',
@@ -702,7 +565,7 @@ class _SearchState extends State<Search> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: _infoRow(
+                    child: infoRow(
                       Icons.email,
                       "이메일",
                       info['email'] ?? '',
@@ -711,7 +574,7 @@ class _SearchState extends State<Search> {
                 ],
               ),
               const SizedBox(height: 8),
-              _infoRow(
+              infoRow(
                 Icons.link,
                 "사이트",
                 info['website'] ?? '',
@@ -783,6 +646,159 @@ class _SearchState extends State<Search> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          // 배경 그라데이션
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFE3E5ED),
+                  Color(0xFFDADCE2),
+                ],
+              ),
+            ),
+          ),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 18.0),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  // 오른쪽 상단 '큰 글자' 스위치
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 300),
+                        style: TextStyle(
+                          fontSize: _isLargeText ? 28 : 23,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                        child: const Text('큰 글자'),
+                      ),
+                      const SizedBox(width: 3),
+                      Switch(
+                        value: _isLargeText,
+                        onChanged: (value) {
+                          setState(() {
+                            _isLargeText = value;
+                          });
+                        },
+                        inactiveThumbColor: Colors.white,
+                        inactiveTrackColor: Colors.grey,
+                        activeColor: Colors.white,
+                        activeTrackColor: Colors.blueAccent,
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                  ),
+                  // "외부" 뉴모피즘 컨테이너 (고정) + 내부 내용(PageView)만 이동
+                  // 사용자가 드래그 시작/끝을 알기 위해 NotificationListener 사용
+                  NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      // 스크롤 시작하면 타이머 멈춤
+                      if (notification is ScrollStartNotification) {
+                        _stopAutoSlide();
+                      }
+                      // 스크롤 끝나면 타이머 재시작
+                      else if (notification is ScrollEndNotification) {
+                        _startAutoSlide();
+                      }
+                      return false;
+                    },
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minHeight: 200,
+                        maxHeight: 350,
+                      ),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        color: const Color(0xFFF0F0F3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            offset: const Offset(6, 6),
+                            blurRadius: 10,
+                          ),
+                          BoxShadow(
+                            color: Colors.white.withOpacity(0.8),
+                            offset: const Offset(-6, -6),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: PageView.builder(
+                          controller: _pageController,
+                          physics: const PageScrollPhysics(),
+                          itemCount: _collegeList.length,
+                          onPageChanged: (index) {
+                            // 현재 페이지 인덱스 업데이트
+                            _currentPage = index;
+                          },
+                          itemBuilder: (context, index) {
+                            final info = _collegeList[index];
+                            return _buildCollegeContent(info);
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  // 2 x 2 버튼 (뉴모피즘)
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 20,
+                    crossAxisSpacing: 20,
+                    childAspectRatio: 0.85,
+                    children: [
+                      _buildNeumorphicButton(
+                        text: '대학\n이름 찾기',
+                        icon: Icons.school,
+                        color: const Color(0xFFFFC8D0),
+                        onTap: () => _navigateTo(context, const SearchUniv()),
+                      ),
+                      _buildNeumorphicButton(
+                        text: '과목\n이름 찾기',
+                        icon: Icons.menu_book,
+                        color: const Color(0xFFFFF5B3),
+                        onTap: () => _navigateTo(context, const SearchSubject()),
+                      ),
+                      _buildNeumorphicButton(
+                        text: '위치로\n찾기',
+                        icon: Icons.location_on,
+                        color: const Color(0xFFB7FFBF),
+                        onTap: () => _navigateTo(context, const SearchGPS()),
+                      ),
+                      _buildNeumorphicButton(
+                        text: '뒤로 가기',
+                        icon: Icons.arrow_back,
+                        color: const Color(0xFFB7EEFF),
+                        onTap: _goBack,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
