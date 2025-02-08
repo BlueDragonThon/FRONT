@@ -1,16 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math'; // 랜덤 뽑기용
 import 'package:http/http.dart' as http;
-import 'package:bluedragonthon/screens/reminder.dart';
-import 'package:bluedragonthon/screens/search_gps.dart';
-import 'package:bluedragonthon/screens/search_subject.dart';
-import 'package:bluedragonthon/screens/search_univ.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart'; // <-- HapticFeedback을 사용하려면 추가
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:math'; // 랜덤 뽑기용
 import 'package:bluedragonthon/services/api_service.dart';
+<<<<<<< HEAD
+=======
+import 'package:bluedragonthon/screens/reminder.dart';
+import 'package:bluedragonthon/screens/search_gps.dart';
+import 'package:bluedragonthon/screens/search_subject.dart';
+import 'package:bluedragonthon/screens/search_univ.dart';
+>>>>>>> 5648e135416b4f9072772fe14f531422be8b95ee
 
 class Search extends StatefulWidget {
   const Search({super.key});
@@ -22,6 +25,7 @@ class Search extends StatefulWidget {
 class _SearchState extends State<Search> {
   // -------------------------------------------------
   // "큰 글자 모드" 여부
+  // (SharedPreferences에서 로드/저장)
   // -------------------------------------------------
   bool _isLargeText = false;
 
@@ -43,66 +47,72 @@ class _SearchState extends State<Search> {
     await prefs.setBool('isLargeText', value);
   }
 
-  /// 사용자 슬라이드용 PageController (가로 이동)
+  /// PageView 컨트롤러 (대학 추천 슬라이드)
   late PageController _pageController;
 
-  /// 자동 슬라이드 기능을 위한 Timer
+  /// 자동 슬라이드 타이머
   Timer? _autoSlideTimer;
 
   /// 현재 페이지 인덱스
   int _currentPage = 0;
 
-  /// 예시 데이터 (실제로는 fetchCollegeInfo() 결과를 받아올 수 있음)
+  /// 대학 정보 리스트
   List<Map<String, String>> _collegeList = [];
 
   @override
   void initState() {
     super.initState();
+    // 큰 글자 설정 먼저 로드
+    _loadLargeTextSetting();
+    // 페이지 컨트롤러 초기화
     _pageController = PageController();
-    _fetchCollegeData(); // <-- API에서 데이터 불러오기
-    // 초기 자동 슬라이드 시작
+    // 서버에서 대학 데이터 불러오기
+    _fetchCollegeData();
+    // 자동 슬라이드 시작
     _startAutoSlide();
+  }
+
+  @override
+  void dispose() {
+    // 자동 슬라이드 타이머 정리
+    _stopAutoSlide();
+    _pageController.dispose();
+    super.dispose();
   }
 
   /// 서버에서 데이터 불러오는 함수
   Future<void> _fetchCollegeData() async {
     try {
-      // 1) API 호출
       final response = await ApiService.searchCollege(page: 0);
       final allItems = response.result.result; // List<LikeUnivItem>
 
       if (allItems.isEmpty) {
-        // 빈 리스트라면 처리
         print('No colleges found');
         return;
       }
 
-      // 2) 랜덤으로 4개만 추출
+      // 랜덤으로 4개만 추출
       final random = Random();
-      final temp = [...allItems]; // 복사본
+      final temp = [...allItems];
       final chosen = <LikeUnivItem>[];
 
-      // 최대 4개, temp가 비지 않는 동안
       for (int i = 0; i < 4 && temp.isNotEmpty; i++) {
         final idx = random.nextInt(temp.length);
         chosen.add(temp.removeAt(idx));
       }
 
-      // 3) UI에서 쓰기 편하도록 Map<String,String> 변환
-      //    (프로그램(program) 등 다른 필드도 원하시면 적절히 가공)
+      // UI에서 쓰기 편하도록 맵핑
       final mapped = chosen.map((item) {
         return {
           'collegeName': item.name,
-          'subjectName': item.program.isNotEmpty
-              ? item.program.join(', ')
-              : '정보 없음',
+          'subjectName':
+          item.program.isNotEmpty ? item.program.join(', ') : '정보 없음',
           'phone': item.contactInfo,
           'email': item.headmaster,
           'website': item.address,
         };
       }).toList();
 
-      // 4) 상태 갱신
       setState(() {
         _collegeList = mapped;
       });
@@ -111,34 +121,23 @@ class _SearchState extends State<Search> {
     }
   }
 
-  @override
-  void dispose() {
-    // Timer 해제
-    _stopAutoSlide();
-    _pageController.dispose();
-    super.dispose();
-  }
-
   /// 5초 간격으로 자동 슬라이드 시작
   void _startAutoSlide() {
-    // 먼저 타이머가 있다면 해제
-    _stopAutoSlide();
+    _stopAutoSlide(); // 혹시 기존 타이머가 있으면 먼저 정지
     _autoSlideTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      // 다음 페이지로 이동
       _goToNextPage();
     });
   }
 
   /// 자동 슬라이드 정지
   void _stopAutoSlide() {
-    if (_autoSlideTimer != null) {
-      _autoSlideTimer!.cancel();
-      _autoSlideTimer = null;
-    }
+    _autoSlideTimer?.cancel();
+    _autoSlideTimer = null;
   }
 
-  /// 다음 페이지로 이동 (마지막 페이지에서 다시 첫 페이지로)
+  /// 다음 페이지로 이동
   void _goToNextPage() {
+    if (_collegeList.isEmpty) return;
     final nextPage = (_currentPage + 1) % _collegeList.length;
     _pageController.animateToPage(
       nextPage,
@@ -152,7 +151,7 @@ class _SearchState extends State<Search> {
     Navigator.pop(context);
   }
 
-  /// URL 실행 (원본 코드 유지)
+  /// URL 실행
   Future<void> _launchUrl(Uri url) async {
     if (!await launchUrl(url)) {
       throw Exception('Could not launch $url');
@@ -172,13 +171,17 @@ class _SearchState extends State<Search> {
     );
   }
 
-  /// 카드 내부 내용만 (대학 정보 표출)
+  /// 카드 내부 내용만 (대학 정보)
   Widget _buildCollegeContent(Map<String, String> info) {
     final double labelSize = _isLargeText ? 26 : 20;
     final double contentSize = _isLargeText ? 22 : 18;
 
-    Widget infoRow(IconData icon, String label, String content,
-        {VoidCallback? onTap}) {
+    Widget infoRow(
+        IconData icon,
+        String label,
+        String content, {
+          VoidCallback? onTap,
+        }) {
       final labelWidget = AnimatedDefaultTextStyle(
         duration: const Duration(milliseconds: 250),
         style: TextStyle(
@@ -197,7 +200,6 @@ class _SearchState extends State<Search> {
           decoration:
               onTap != null ? TextDecoration.underline : TextDecoration.none,
         ),
-        // onTap 내부에서도 진동 발생
         child: InkWell(
           onTap: onTap != null
               ? () {
@@ -232,9 +234,9 @@ class _SearchState extends State<Search> {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(17),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center, // 타이틀 중앙
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
@@ -246,7 +248,7 @@ class _SearchState extends State<Search> {
             child: const Text("추천 대학", textAlign: TextAlign.center),
           ),
           const SizedBox(height: 10),
-          // 나머지 항목은 상단 정렬(좌측)
+          // 나머지는 상단 정렬(좌측)
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -292,7 +294,6 @@ class _SearchState extends State<Search> {
                       Icons.email,
                       "이메일",
                       info['email'] ?? '',
-                      // 여기는 onTap 없음
                     ),
                   ),
                 ],
@@ -325,7 +326,6 @@ class _SearchState extends State<Search> {
     required VoidCallback onTap,
   }) {
     return InkWell(
-      // 버튼 클릭 시 진동
       onTap: () {
         HapticFeedback.lightImpact();
         onTap();
@@ -381,94 +381,160 @@ class _SearchState extends State<Search> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          // 배경 그라데이션
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFE3E5ED),
-                  Color(0xFFDADCE2),
+      // -----------------------
+      // 두 번째 코드와 같은 구조의 AppBar(상단 영역) + 배경 그라데이션
+      // -----------------------
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFE3E5ED),
+              Color(0xFFDADCE2),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              // -----------------------
+              // 1) 상단: "큰 글자" 스위치 (MobileAlertScreen과 동일 로직)
+              // -----------------------
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 300),
+                    style: TextStyle(
+                      fontSize: _isLargeText ? 28 : 23,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                    child: const Text('큰 글자'),
+                  ),
+                  const SizedBox(width: 3),
+                  Switch(
+                    value: _isLargeText,
+                    onChanged: (value) {
+                      HapticFeedback.lightImpact();
+                      setState(() {
+                        _isLargeText = value;
+                      });
+                      // 바뀐 값을 캐시에 저장
+                      _saveLargeTextSetting(value);
+                    },
+                    inactiveThumbColor: Colors.white,
+                    inactiveTrackColor: Colors.grey,
+                    activeColor: Colors.white,
+                    activeTrackColor: Colors.blueAccent,
+                  ),
+                  const SizedBox(width: 12),
                 ],
               ),
-            ),
-          ),
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 18.0),
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  // 오른쪽 상단 '큰 글자' 스위치
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+              const SizedBox(height: 10),
+
+              // -----------------------
+              // 2) 나머지 메인 컨텐츠 (SingleChildScrollView)
+              // -----------------------
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 18.0),
+                  child: Column(
                     children: [
-                      AnimatedDefaultTextStyle(
-                        duration: const Duration(milliseconds: 300),
-                        style: TextStyle(
-                          fontSize: _isLargeText ? 28 : 23,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                        child: const Text('큰 글자'),
-                      ),
-                      const SizedBox(width: 3),
-                      Switch(
-                        value: _isLargeText,
-                        onChanged: (value) {
-                          // 스위치 변경 시 진동
-                          HapticFeedback.lightImpact();
-                          setState(() {
-                            _isLargeText = value;
-                          });
+                      // 추천 대학 뉴모피즘 컨테이너
+                      // (PageView로 자동 슬라이드)
+                      NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification is ScrollStartNotification) {
+                            _stopAutoSlide();
+                          } else if (notification is ScrollEndNotification) {
+                            _startAutoSlide();
+                          }
+                          return false;
                         },
-                        inactiveThumbColor: Colors.white,
-                        inactiveTrackColor: Colors.grey,
-                        activeColor: Colors.white,
-                        activeTrackColor: Colors.blueAccent,
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                  ),
-                  // "외부" 뉴모피즘 컨테이너 (고정) + 내부 내용(PageView)만 이동
-                  // 사용자가 드래그 시작/끝을 알기 위해 NotificationListener 사용
-                  NotificationListener<ScrollNotification>(
-                    onNotification: (notification) {
-                      // 스크롤 시작하면 타이머 멈춤
-                      if (notification is ScrollStartNotification) {
-                        _stopAutoSlide();
-                      }
-                      // 스크롤 끝나면 타이머 재시작
-                      else if (notification is ScrollEndNotification) {
-                        _startAutoSlide();
-                      }
-                      return false;
-                    },
-                    child: Container(
-                      constraints: const BoxConstraints(
-                        minHeight: 200,
-                        maxHeight: 350,
-                      ),
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        color: const Color(0xFFF0F0F3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            offset: const Offset(6, 6),
-                            blurRadius: 10,
+                        child: Container(
+                          constraints: BoxConstraints(minHeight: _isLargeText ? 250 : 200, maxHeight: _isLargeText ? 420 : 350),
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            color: const Color(0xFFF0F0F3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.15),
+                                offset: const Offset(6, 6),
+                                blurRadius: 10,
+                              ),
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.8),
+                                offset: const Offset(-6, -6),
+                                blurRadius: 10,
+                              ),
+                            ],
                           ),
-                          BoxShadow(
-                            color: Colors.white.withOpacity(0.8),
-                            offset: const Offset(-6, -6),
-                            blurRadius: 10,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: _collegeList.isEmpty
+                                ? const Center(
+                              child: Text(
+                                "불러오는 중...",
+                                style: TextStyle(fontSize: 20),
+                              ),
+                            )
+                                : PageView.builder(
+                              controller: _pageController,
+                              physics: const PageScrollPhysics(),
+                              itemCount: _collegeList.length,
+                              onPageChanged: (index) {
+                                _currentPage = index;
+                              },
+                              itemBuilder: (context, index) {
+                                final info = _collegeList[index];
+                                return _buildCollegeContent(info);
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // 2 x 2 버튼 (뉴모피즘)
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 20,
+                        crossAxisSpacing: 20,
+                        childAspectRatio: 0.85,
+                        children: [
+                          _buildNeumorphicButton(
+                            text: '대학\n이름 찾기',
+                            icon: Icons.school,
+                            color: const Color(0xFFFFC8D0),
+                            onTap: () => _navigateTo(context, const SearchUniv()),
+                          ),
+                          _buildNeumorphicButton(
+                            text: '과목\n이름 찾기',
+                            icon: Icons.menu_book,
+                            color: const Color(0xFFFFF5B3),
+                            onTap: () =>
+                                _navigateTo(context, const SearchSubject()),
+                          ),
+                          _buildNeumorphicButton(
+                            text: '위치로\n찾기',
+                            icon: Icons.location_on,
+                            color: const Color(0xFFB7FFBF),
+                            onTap: () => _navigateTo(context, const SearchGPS()),
+                          ),
+                          _buildNeumorphicButton(
+                            text: '뒤로 가기',
+                            icon: Icons.arrow_back,
+                            color: const Color(0xFFB7EEFF),
+                            onTap: _goBack,
                           ),
                         ],
                       ),
+<<<<<<< HEAD
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(24),
                         child: PageView.builder(
@@ -522,14 +588,16 @@ class _SearchState extends State<Search> {
                         color: const Color(0xFFB7EEFF),
                         onTap: _goBack,
                       ),
+=======
+                      const SizedBox(height: 40),
+>>>>>>> 5648e135416b4f9072772fe14f531422be8b95ee
                     ],
                   ),
-                  const SizedBox(height: 40),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

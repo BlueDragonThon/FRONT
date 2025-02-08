@@ -73,7 +73,7 @@ class _MobileLikeUnivListScreenState extends State<MobileLikeUnivListScreen> {
   }
 
   // --------------------
-  // 찜 해제
+  // 찜 해제(삭제)
   // --------------------
   Future<void> _deleteLikeUniv(int collegeId) async {
     try {
@@ -270,7 +270,7 @@ class _MobileLikeUnivListScreenState extends State<MobileLikeUnivListScreen> {
   }
 }
 
-/// 뉴모피즘 카드 (찜 해제 버튼 포함)
+/// 뉴모피즘 카드 (하트 아이콘 사용)
 class _NeumorphicLikeUnivCard extends StatelessWidget {
   final LikeUnivItem univItem;
   final bool isLargeText;
@@ -342,46 +342,31 @@ class _NeumorphicLikeUnivCard extends StatelessWidget {
                   style: TextStyle(fontSize: contentFontSize),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  univItem.favorites ? '★ 찜한 상태' : '찜 해제됨',
-                  style: TextStyle(
-                    fontSize: contentFontSize,
-                    color: univItem.favorites ? Colors.blue : Colors.grey,
-                  ),
-                ),
+                // 필요하면 상태 표시 문구
+                // Text(
+                //   univItem.favorites ? '★ 찜한 상태' : '찜 해제됨',
+                //   style: TextStyle(
+                //     fontSize: contentFontSize,
+                //     color: univItem.favorites ? Colors.blue : Colors.grey,
+                //   ),
+                // ),
               ],
             ),
           ),
-          // 오른쪽: 찜 해제 버튼
+          // 오른쪽: 하트 아이콘 (채워진 상태 → 누르면 삭제)
           Container(
             margin: const EdgeInsets.only(left: 10),
             alignment: Alignment.center,
             child: GestureDetector(
-              onTap: onDelete,
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      offset: const Offset(4, 4),
-                      blurRadius: 10,
-                    ),
-                    BoxShadow(
-                      color: Colors.white.withOpacity(0.8),
-                      offset: const Offset(-4, -4),
-                      blurRadius: 10,
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.delete_forever,
-                  size: iconSize,
-                  color: Colors.white,
-                ),
+              onTap: () {
+                // 하트가 채워진 상태에서 누르면 '삭제' 로직 수행
+                HapticFeedback.lightImpact();
+                onDelete();
+              },
+              child: Icon(
+                Icons.favorite,
+                size: iconSize,
+                color: Colors.red,
               ),
             ),
           ),
