@@ -52,6 +52,7 @@ class _SearchUnivState extends State<SearchUniv> {
   }
 
   Future<void> _toggleHeart(University univ) async {
+    print('토글 요청: 대학 ID = ${univ.id}');
     try {
       final newState = await UniversityService.toggleHeart(univ.id, univ.isHeart);
       setState(() {
@@ -149,6 +150,8 @@ class _SearchUnivState extends State<SearchUniv> {
                   itemCount: _searchResults.length,
                   itemBuilder: (context, index) {
                     final univ = _searchResults[index];
+
+
                     return UniversityListItem(
                       university: univ,
                       onToggleHeart: () => _toggleHeart(univ),
