@@ -4,7 +4,6 @@ import 'package:bluedragonthon/utils/university_model.dart';
 import 'package:bluedragonthon/widgets/university_widgets.dart';
 import 'package:flutter/material.dart';
 
-
 class SearchUniv extends StatefulWidget {
   const SearchUniv({super.key});
 
@@ -36,7 +35,8 @@ class _SearchUnivState extends State<SearchUniv> {
 
     try {
       // 대학 이름 검색 API: 세부 주소로 '/university/search' 전달
-      final results = await UniversityService.searchUniversity(searchText, '/api/college/name');
+      final results = await UniversityService.searchUniversity(
+          searchText, '/api/college/name');
       setState(() {
         _searchResults = results;
       });
@@ -54,7 +54,8 @@ class _SearchUnivState extends State<SearchUniv> {
   Future<void> _toggleHeart(University univ) async {
     print('토글 요청: 대학 ID = ${univ.id}');
     try {
-      final newState = await UniversityService.toggleHeart(univ.id, univ.isHeart);
+      final newState =
+          await UniversityService.toggleHeart(univ.id, univ.isHeart);
       setState(() {
         _searchResults = _searchResults.map((u) {
           if (u.id == univ.id) {
@@ -150,9 +151,8 @@ class _SearchUnivState extends State<SearchUniv> {
                   itemCount: _searchResults.length,
                   itemBuilder: (context, index) {
                     final univ = _searchResults[index];
-
-
                     return UniversityListItem(
+                      key: ValueKey(univ.id), // 고유 키 추가
                       university: univ,
                       onToggleHeart: () => _toggleHeart(univ),
                     );

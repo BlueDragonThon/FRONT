@@ -1,5 +1,3 @@
-import 'dart:ffi';
-
 class University {
   final int id;
   final String name;
@@ -23,7 +21,7 @@ class University {
       name: json['name'] as String,
       contactInfo: json['contactInfo'] as String,
       address: json['address'] as String,
-      isHeart: json['isHeart'] ?? false, // null이면 false 할당
+      isHeart: json['favorite'] ?? false, // null이면 false 할당
       program: (json['program'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??

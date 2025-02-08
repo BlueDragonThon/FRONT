@@ -76,6 +76,7 @@ class UniversityService {
           jsonDecode(utf8.decode(response.bodyBytes));
       if (jsonResponse['isSuccess'] == true) {
         final List<dynamic> results = jsonResponse['result']['result'];
+        print("하트반영2$results");
         return results.map((data) => University.fromJson(data)).toList();
       } else {
         throw Exception(jsonResponse['message'] ?? '검색에 실패했습니다.');
@@ -86,67 +87,70 @@ class UniversityService {
   }
 
   /// 하트 토글 API 호출: 사용자 토큰을 id로 전송
-static Future<bool> toggleHeart(int universityId, bool currentState) async {
-  final String? token = await TokenManager.getToken();
-  if (token == null) {
-    throw Exception('No token found');
+  static Future<bool> toggleHeart(int universityId, bool currentState) async {
+    final String? token = await TokenManager.getToken();
+    if (token == null) {
+      throw Exception('No token found');
+    }
+    print("하트 반영 1 $currentState");
+    final Uri url = Uri.parse('$baseUrl/api/college/like');
+    final String body =
+        "collegeId=${Uri.encodeQueryComponent(universityId.toString())}";
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded', // 변경된 부분
+        'Authorization': 'Bearer $token',
+      },
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      return !currentState;
+    } else {
+      throw Exception('하트 요청 실패: ${response.statusCode}');
+    }
   }
 
-  final Uri url = Uri.parse('$baseUrl/api/college/like');
-  final String body = "collegeId=${Uri.encodeQueryComponent(universityId.toString())}";
+  static Future<List<University>> sendLocationData({
+    required double acr,
+    required double dwn,
+    int page = 0,
+  }) async {
+    final Uri url = Uri.parse('$baseUrl/api/college/distance');
 
-  final response = await http.post(
-    url,
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded', // 변경된 부분
-      'Authorization': 'Bearer $token',
-    },
-    body: body,
-  );
+    final body = jsonEncode({
+      "acr": acr,
+      "dwn": dwn,
+      "page": 1, // 혹은 page 매개변수를 사용할 수 있음
+    });
 
-  if (response.statusCode == 200) {
-    return !currentState;
-  } else {
-    throw Exception('하트 요청 실패: ${response.statusCode}');
-  }
-}
-
-
-static Future<List<University>> sendLocationData({
-  required double acr,
-  required double dwn,
-  int page = 0,
-}) async {
-  final Uri url = Uri.parse('$baseUrl/api/college/distance');
-
-  final body = jsonEncode({
-    "acr": acr,
-    "dwn": dwn,
-    "page": 1, // 혹은 page 매개변수를 사용할 수 있음
-  });
-
-   final String? token = await TokenManager.getToken();
+    final String? token = await TokenManager.getToken();
     if (token == null) {
       throw Exception('No token found');
     }
 
-  final response = await http.post(
-    url,
-    headers: {'Content-Type': 'application/json',
-    'Authorization': 'Bearer $token'},
-    body: body,
-  );
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token'
+      },
+      body: body,
+    );
 
-  if (response.statusCode == 200) {
-    final Map<String, dynamic> jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
-    if (jsonResponse['isSuccess'] == true) {
-      final List<dynamic> results = jsonResponse['result']['result'];
-      return results.map((data) => University.fromJson(data)).toList();
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> jsonResponse =
+          jsonDecode(utf8.decode(response.bodyBytes));
+      if (jsonResponse['isSuccess'] == true) {
+        final List<dynamic> results = jsonResponse['result']['result'];
+        return results.map((data) => University.fromJson(data)).toList();
+      } else {
+        throw Exception(jsonResponse['message'] ?? '검색에 실패했습니다.');
+      }
     } else {
-      throw Exception(jsonResponse['message'] ?? '검색에 실패했습니다.');
+      throw Exception('Location API error: ${response.statusCode}');
     }
-  } else {
-    throw Exception('Location API error: ${response.statusCode}');
   }
-}
 }

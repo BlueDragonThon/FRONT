@@ -149,6 +149,7 @@ class _SearchSubjectState extends State<SearchSubject> {
                   itemBuilder: (context, index) {
                     final univ = _searchResults[index];
                     return UniversityListItem(
+                      key: ValueKey(univ.id), // 고유 키 추가
                       university: univ,
                       onToggleHeart: () => _toggleHeart(univ),
                     );

@@ -1,9 +1,8 @@
-// university_widgets.dart
 import 'package:bluedragonthon/utils/university_model.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class UniversityListItem extends StatelessWidget {
+class UniversityListItem extends StatefulWidget {
   final University university;
   final VoidCallback onToggleHeart;
 
@@ -12,6 +11,29 @@ class UniversityListItem extends StatelessWidget {
     required this.university,
     required this.onToggleHeart,
   });
+
+  @override
+  _UniversityListItemState createState() => _UniversityListItemState();
+}
+
+class _UniversityListItemState extends State<UniversityListItem> {
+  late bool _isHeart;
+
+  @override
+  void initState() {
+    super.initState();
+    _isHeart = widget.university.isHeart;
+  }
+
+  @override
+  void didUpdateWidget(covariant UniversityListItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.university.isHeart != widget.university.isHeart) {
+      setState(() {
+        _isHeart = widget.university.isHeart;
+      });
+    }
+  }
 
   Future<void> _launchUrl(Uri url) async {
     if (!await launchUrl(url)) {
@@ -29,7 +51,7 @@ class UniversityListItem extends StatelessWidget {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         title: Text(
-          university.name,
+          widget.university.name,
           style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
@@ -38,24 +60,20 @@ class UniversityListItem extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                Text(
+                const Text(
                   '전화번호',
-                  style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.w600),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                 ),
-                // 전화번호 터치 시 전화 앱으로 연결
-                SizedBox(
-                  width: 10,
-                ),
+                const SizedBox(width: 10),
                 InkWell(
                   onTap: () async {
                     final String phoneNumber =
-                        university.contactInfo.replaceAll('-', '');
+                        widget.university.contactInfo.replaceAll('-', '');
                     final Uri telUri = Uri(scheme: 'tel', path: phoneNumber);
                     await _launchUrl(telUri);
                   },
                   child: Text(
-                    university.contactInfo,
+                    widget.university.contactInfo,
                     style: const TextStyle(
                       fontSize: 20,
                       color: Colors.blue,
@@ -66,37 +84,33 @@ class UniversityListItem extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Text(
+            const Text(
               '주소',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             Text(
-              university.address,
+              widget.university.address,
               style: const TextStyle(fontSize: 20),
             ),
-            SizedBox(
-              height: 10,
-            ),
+            const SizedBox(height: 10),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               '프로그램',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             Text(
-              university.program.join(", "),
-              style: const TextStyle(
-                fontSize: 20,
-              ),
+              widget.university.program.join(", "),
+              style: const TextStyle(fontSize: 20),
             ),
           ],
         ),
         trailing: IconButton(
           icon: Icon(
-            university.isHeart ? Icons.favorite : Icons.favorite_border,
+            widget.university.isHeart ? Icons.favorite : Icons.favorite_border,
             color: Colors.red,
             size: 30,
           ),
-          onPressed: onToggleHeart,
+          onPressed: widget.onToggleHeart,
         ),
       ),
     );

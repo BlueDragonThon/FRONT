@@ -1,11 +1,12 @@
-import 'package:bluedragonthon/services/api_service.dart';
 import 'package:bluedragonthon/utils/token_manager.dart';
+import 'package:bluedragonthon/widgets/university_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // 진동 효과
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:bluedragonthon/services/search_api_service.dart';
+import 'package:bluedragonthon/utils/university_model.dart';
 
 class SearchGPS extends StatefulWidget {
   const SearchGPS({super.key});
@@ -23,14 +24,16 @@ class _SearchGPSState extends State<SearchGPS> {
   // 검색 중 표시할 인디케이터 플래그
   bool _isSearching = false;
 
-  // 검색 결과 (주소 문자열)
+  // 검색 결과 (주소 문자열) 및 각 결과의 위도/경도 정보
   List<String> _searchResults = [];
-  // 각 결과에 해당하는 위도/경도 정보 (Offset.dx: latitude, dy: longitude)
   final List<Offset> _searchCoords = [];
 
   // 최종 선택된 위치의 위도/경도
   double _selectedLat = 0.0;
   double _selectedLng = 0.0;
+
+  // 백엔드로부터 받아온 대학교 리스트
+  List<University> _universities = [];
 
   @override
   void initState() {
@@ -72,7 +75,8 @@ class _SearchGPSState extends State<SearchGPS> {
     }
   }
 
-  /// "검색하기" 버튼을 누르면 선택된 주소의 위도와 경도를 백엔드로 전송합니다.
+  /// "검색하기" 버튼을 누르면 선택된 주소의 위도/경도 정보를 백엔드로 전송하여
+  /// 대학교 리스트를 받아오고, 메인 화면 하단에 스크롤 가능한 리스트로 출력합니다.
   Future<void> _sendLocationToBackend() async {
     HapticFeedback.lightImpact();
     final addr = _finalAddressController.text.trim();
@@ -82,12 +86,18 @@ class _SearchGPSState extends State<SearchGPS> {
       return;
     }
     try {
-      final response = await UniversityService.sendLocationData(
+      final universities = await UniversityService.sendLocationData(
         acr: _selectedLat,
         dwn: _selectedLng,
         page: 0,
       );
-      _showSnackBar('위치 전송 성공: ${response.toString()}');
+      await _saveLocation(addr, _selectedLat, _selectedLng);
+      setState(() {
+        _universities = universities;
+      });
+      if (_universities.isEmpty) {
+        _showSnackBar('검색 결과가 없습니다.');
+      }
     } catch (e) {
       _showSnackBar('위치 전송 실패: $e');
     }
@@ -249,7 +259,28 @@ class _SearchGPSState extends State<SearchGPS> {
   }
 
   void _showSnackBar(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// 대학교 리스트 항목의 하트(즐겨찾기) 상태를 토글합니다.
+  Future<void> _toggleHeart(University university, int index) async {
+    try {
+      final newHeartState = await UniversityService.toggleHeart(
+          university.id, university.isHeart);
+      setState(() {
+        _universities[index] = University(
+          id: university.id,
+          name: university.name,
+          contactInfo: university.contactInfo,
+          address: university.address,
+          isHeart: newHeartState,
+          program: university.program,
+        );
+      });
+    } catch (e) {
+      _showSnackBar('하트 업데이트 실패: $e');
+    }
   }
 
   @override
@@ -294,95 +325,111 @@ class _SearchGPSState extends State<SearchGPS> {
     );
   }
 
-  /// 메인 뷰: 선택된 주소(읽기 전용 텍스트필드)와 검색, "검색하기" 버튼 구성
+  /// 메인 뷰: 선택된 주소(읽기 전용 텍스트필드), 검색, "검색하기" 버튼과
+  /// 백엔드에서 받아온 대학교 리스트(스와이프 가능)를 출력합니다.
   Widget _buildMainView() {
     return Container(
       key: const ValueKey('MainView'),
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      child: Center(
-        child: Column(
-          children: [
-            const Text(
-              '위치로 대학 찾기',
-              style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 48),
-            Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 60,
-                    child: TextField(
-                      controller: _finalAddressController,
-                      readOnly: true,
-                      style: const TextStyle(fontSize: 25),
-                      decoration: InputDecoration(
-                        hintText: '주소를 선택하세요',
-                        hintStyle: const TextStyle(
-                          color: Colors.black54,
-                          fontSize: 25,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(32.0),
-                          borderSide:
-                              const BorderSide(width: 2, color: Colors.grey),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(32.0),
-                          borderSide: BorderSide(
-                            width: 2,
-                            color: Theme.of(context).primaryColor,
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '위치로 대학 찾기',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 48),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
                   height: 60,
-                  child: ElevatedButton(
-                    onPressed: _openSearchView,
-                    style: ElevatedButton.styleFrom(
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(32.0),
+                  child: TextField(
+                    controller: _finalAddressController,
+                    readOnly: true,
+                    style: const TextStyle(fontSize: 25),
+                    decoration: InputDecoration(
+                      hintText: '주소를 선택하세요',
+                      hintStyle: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 25,
                       ),
-                      backgroundColor: Theme.of(context).primaryColor,
-                      fixedSize: const Size(100, 60),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(32.0),
+                        borderSide:
+                            const BorderSide(width: 2, color: Colors.grey),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(32.0),
+                        borderSide: BorderSide(
+                          width: 2,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 14,
+                      ),
                     ),
-                    child: const Icon(Icons.gps_fixed, color: Colors.black87),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            // "검색하기" 버튼이 눌리면 선택된 주소의 위/경도 정보를 백엔드로 전송합니다.
-            ElevatedButton(
-              onPressed: _sendLocationToBackend,
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(32.0),
-                ),
-                textStyle:
-                    const TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
               ),
-              child: const Text("검색하기"),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 60,
+                child: ElevatedButton(
+                  onPressed: _openSearchView,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(32.0),
+                    ),
+                    backgroundColor: Theme.of(context).primaryColor,
+                    fixedSize: const Size(100, 60),
+                  ),
+                  child: const Icon(Icons.gps_fixed, color: Colors.black87),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // "검색하기" 버튼: 위/경도 정보를 백엔드로 전송하고 대학교 리스트를 업데이트합니다.
+          ElevatedButton(
+            onPressed: _sendLocationToBackend,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(32.0),
+              ),
+              textStyle: const TextStyle(
+                  fontSize: 25, fontWeight: FontWeight.bold),
             ),
-          ],
-        ),
+            child: const Text("검색하기"),
+          ),
+          const SizedBox(height: 20),
+          // 대학교 리스트가 있을 경우 아래에 스크롤 가능한 리스트로 출력합니다.
+          if (_universities.isNotEmpty)
+            Expanded(
+              child: ListView.builder(
+                itemCount: _universities.length,
+                itemBuilder: (context, index) {
+                  final uni = _universities[index];
+                  return UniversityListItem(
+                    university: uni,
+                    onToggleHeart: () => _toggleHeart(uni, index),
+                  );
+                },
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  /// 검색 뷰: 검색어 입력, 주소 검색, GPS 기반 검색, 그리고 검색 결과 목록
+  /// 검색 뷰: 주소 검색을 위한 텍스트필드, 검색 버튼, 위치 기반 검색 버튼, 그리고
+  /// 검색 결과 목록(주소 선택 시 메인 화면에 반영)
   Widget _buildSearchView() {
     return Container(
       key: const ValueKey('SearchView'),
@@ -403,8 +450,8 @@ class _SearchGPSState extends State<SearchGPS> {
                     style: const TextStyle(fontSize: 22),
                     decoration: InputDecoration(
                       hintText: '검색어 입력',
-                      hintStyle:
-                          const TextStyle(color: Colors.black54, fontSize: 20),
+                      hintStyle: const TextStyle(
+                          color: Colors.black54, fontSize: 20),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(32.0),
                         borderSide:
@@ -471,7 +518,7 @@ class _SearchGPSState extends State<SearchGPS> {
     );
   }
 
-  /// 검색 결과 목록 (리스트뷰). 각 결과를 선택하면 _onSelectResultIndex가 호출됩니다.
+  /// 주소 검색 결과 목록 (리스트뷰). 각 결과를 선택하면 _onSelectResultIndex가 호출됩니다.
   Widget _buildSearchResults() {
     if (_isSearching) {
       return const Center(child: CircularProgressIndicator());
