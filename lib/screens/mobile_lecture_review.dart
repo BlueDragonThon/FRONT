@@ -7,17 +7,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'mobile_lecture_review_create.dart'; // 풀스크린 작성 페이지
 
 class MobileLectureReviewScreen extends StatefulWidget {
-  const MobileLectureReviewScreen({Key? key}) : super(key: key);
+  const MobileLectureReviewScreen({super.key});
 
   @override
-  State<MobileLectureReviewScreen> createState() => _MobileLectureReviewScreenState();
+  State<MobileLectureReviewScreen> createState() =>
+      _MobileLectureReviewScreenState();
 }
 
 class _MobileLectureReviewScreenState extends State<MobileLectureReviewScreen> {
-  bool _isLargeText = false;       // 큰 글씨 모드
-  List<ReviewItem> _reviews = [];  // 리뷰 목록
-  bool _isLoading = false;         // 로딩 중 여부
-  String _errorMessage = '';       // 에러 메시지
+  bool _isLargeText = false; // 큰 글씨 모드
+  List<ReviewItem> _reviews = []; // 리뷰 목록
+  bool _isLoading = false; // 로딩 중 여부
+  String _errorMessage = ''; // 에러 메시지
 
   @override
   void initState() {
@@ -73,9 +74,11 @@ class _MobileLectureReviewScreenState extends State<MobileLectureReviewScreen> {
   }
 
   /// 리뷰 수정 (팝업)
-  Future<void> _updateReview(ReviewItem review, String newTitle, String newContent) async {
+  Future<void> _updateReview(ReviewItem review, String newTitle,
+      String newProgram, String newContent) async {
     try {
-      await ApiService.updateReview(review.id, newTitle, newContent);
+      await ApiService.updateReview(
+          review.id, newTitle, newProgram, newContent);
       await _fetchReviews();
     } catch (e) {
       setState(() {
@@ -86,20 +89,27 @@ class _MobileLectureReviewScreenState extends State<MobileLectureReviewScreen> {
 
   /// 리뷰 수정 다이얼로그
   void _showUpdateDialog(ReviewItem review) {
-    final titleController = TextEditingController(text: review.title);
+    final univController = TextEditingController(text: review.university);
+    final programController = TextEditingController(text: review.program);
     final contentController = TextEditingController(text: review.content);
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('리뷰 수정', style: TextStyle(fontSize: _isLargeText ? 26 : 20)),
+          title:
+              Text('리뷰 수정', style: TextStyle(fontSize: _isLargeText ? 26 : 20)),
           content: SingleChildScrollView(
             child: Column(
               children: [
                 TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: '제목'),
+                  controller: univController,
+                  decoration: const InputDecoration(labelText: '학교'),
+                  style: TextStyle(fontSize: _isLargeText ? 24 : 16),
+                ),
+                TextField(
+                  controller: programController,
+                  decoration: const InputDecoration(labelText: '프로그램'),
                   style: TextStyle(fontSize: _isLargeText ? 24 : 16),
                 ),
                 TextField(
@@ -113,16 +123,21 @@ class _MobileLectureReviewScreenState extends State<MobileLectureReviewScreen> {
           ),
           actions: [
             TextButton(
-              child: Text('취소', style: TextStyle(fontSize: _isLargeText ? 22 : 16)),
+              child: Text('취소',
+                  style: TextStyle(fontSize: _isLargeText ? 22 : 16)),
               onPressed: () => Navigator.of(context).pop(),
             ),
             ElevatedButton(
-              child: Text('수정', style: TextStyle(fontSize: _isLargeText ? 22 : 16)),
+              child: Text('수정',
+                  style: TextStyle(fontSize: _isLargeText ? 22 : 16)),
               onPressed: () async {
-                final newTitle = titleController.text.trim();
+                final newTitle = univController.text.trim();
+                final newProgram = programController.text.trim();
                 final newContent = contentController.text.trim();
-                if (newTitle.isNotEmpty && newContent.isNotEmpty) {
-                  await _updateReview(review, newTitle, newContent);
+                if (newTitle.isNotEmpty &&
+                    newContent.isNotEmpty &&
+                    newProgram.isNotEmpty) {
+                  await _updateReview(review, newTitle, newProgram, newContent);
                   Navigator.of(context).pop();
                 }
               },
@@ -138,7 +153,8 @@ class _MobileLectureReviewScreenState extends State<MobileLectureReviewScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => MobileLectureReviewCreateScreen(isLargeText: _isLargeText),
+        builder: (_) =>
+            MobileLectureReviewCreateScreen(isLargeText: _isLargeText),
       ),
     );
     // 작성 후 돌아오면 자동 리프레시
@@ -147,20 +163,22 @@ class _MobileLectureReviewScreenState extends State<MobileLectureReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final double labelFontSize = _isLargeText ? 26 : 20;
+    final double labelFontSize = _isLargeText ? 30 : 23;
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, size: labelFontSize),
+          icon: Icon(Icons.arrow_back, size: 55),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text('강의 리뷰', style: TextStyle(fontSize: labelFontSize)),
+        //title: Text('수강 후기', style: TextStyle(fontSize: labelFontSize)),
+        backgroundColor: Color(0xFFE3E5ED),
         actions: [
           Center(
             child: Text(
               '큰 글자',
-              style: TextStyle(fontSize: labelFontSize, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                  fontSize: labelFontSize, fontWeight: FontWeight.w600),
             ),
           ),
           Switch(
@@ -169,8 +187,13 @@ class _MobileLectureReviewScreenState extends State<MobileLectureReviewScreen> {
               setState(() {
                 _isLargeText = value;
               });
+              // 스위치가 변경될 때 SharedPreferences에 즉시 저장
               _saveLargeTextSetting(value);
             },
+            inactiveThumbColor: Colors.white,
+            inactiveTrackColor: Colors.grey,
+            activeColor: Colors.white,
+            activeTrackColor: Colors.blueAccent,
           ),
           const SizedBox(width: 8),
         ],
@@ -246,7 +269,8 @@ class _MobileLectureReviewScreenState extends State<MobileLectureReviewScreen> {
             review: review,
             isLargeText: _isLargeText,
             onDelete: () => _deleteReview(review.id),
-            onEdit: review.isUserCreated ? () => _showUpdateDialog(review) : null,
+            onEdit:
+                review.isUserCreated ? () => _showUpdateDialog(review) : null,
           );
         },
       ),
@@ -259,7 +283,7 @@ class _MobileLectureReviewScreenState extends State<MobileLectureReviewScreen> {
     final double buttonWidth = MediaQuery.of(context).size.width * 0.85;
     final double iconSize = _isLargeText ? 28 : 22;
     final double textSize = _isLargeText ? 24 : 18;
-    const baseColor = Color(0xFFE3E5ED);
+    const baseColor = Color(0xffB3A3EC);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -268,38 +292,46 @@ class _MobileLectureReviewScreenState extends State<MobileLectureReviewScreen> {
           HapticFeedback.mediumImpact();
           _navigateToCreateReviewScreen();
         },
-        child: Container(
-          height: buttonHeight,
-          width: buttonWidth,
-          decoration: BoxDecoration(
-            color: baseColor,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                offset: const Offset(6, 6),
-                blurRadius: 20,
-              ),
-              BoxShadow(
-                color: Colors.white.withOpacity(0.9),
-                offset: const Offset(-6, -6),
-                blurRadius: 20,
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.add, size: iconSize),
-              const SizedBox(width: 8),
-              Text(
-                '리뷰 작성하기',
-                style: TextStyle(
-                  fontSize: textSize,
-                  fontWeight: FontWeight.bold,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 15),
+          child: Container(
+            height: buttonHeight,
+            width: buttonWidth,
+            decoration: BoxDecoration(
+              color: baseColor,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  offset: const Offset(6, 6),
+                  blurRadius: 20,
                 ),
-              ),
-            ],
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.9),
+                  offset: const Offset(-6, -6),
+                  blurRadius: 20,
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.add,
+                  size: iconSize,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '리뷰 작성하기',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: textSize,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -315,12 +347,12 @@ class _NeumorphicReviewCard extends StatelessWidget {
   final VoidCallback? onEdit;
 
   const _NeumorphicReviewCard({
-    Key? key,
+    super.key,
     required this.review,
     required this.isLargeText,
     required this.onDelete,
     this.onEdit,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -355,11 +387,16 @@ class _NeumorphicReviewCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  review.title,
+                  review.university,
                   style: TextStyle(
                     fontSize: contentFontSize + 2,
                     fontWeight: FontWeight.bold,
                   ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  review.program,
+                  style: TextStyle(fontSize: contentFontSize),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -381,12 +418,14 @@ class _NeumorphicReviewCard extends StatelessWidget {
           if (review.isUserCreated) ...[
             IconButton(
               onPressed: onEdit,
-              icon: Icon(Icons.edit, color: Colors.blue, size: contentFontSize + 6),
+              icon: Icon(Icons.edit,
+                  color: Colors.blue, size: contentFontSize + 6),
             ),
           ],
           IconButton(
             onPressed: onDelete,
-            icon: Icon(Icons.delete, color: Colors.red, size: contentFontSize + 6),
+            icon: Icon(Icons.delete,
+                color: Colors.red, size: contentFontSize + 6),
           ),
         ],
       ),

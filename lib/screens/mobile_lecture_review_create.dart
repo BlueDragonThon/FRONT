@@ -7,17 +7,20 @@ class MobileLectureReviewCreateScreen extends StatefulWidget {
   final bool isLargeText;
 
   const MobileLectureReviewCreateScreen({
-    Key? key,
+    super.key,
     required this.isLargeText,
-  }) : super(key: key);
+  });
 
   @override
-  State<MobileLectureReviewCreateScreen> createState() => _MobileLectureReviewCreateScreenState();
+  State<MobileLectureReviewCreateScreen> createState() =>
+      _MobileLectureReviewCreateScreenState();
 }
 
-class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCreateScreen> {
+class _MobileLectureReviewCreateScreenState
+    extends State<MobileLectureReviewCreateScreen> {
   late bool _isLargeText;
-  final _titleController = TextEditingController();
+  final _univController = TextEditingController();
+  final _subjectController = TextEditingController();
   final _contentController = TextEditingController();
 
   bool _isLoading = false;
@@ -37,12 +40,13 @@ class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCre
 
   // 리뷰 작성
   Future<void> _createReview() async {
-    final title = _titleController.text.trim();
+    final univ = _univController.text.trim();
+    final program = _subjectController.text.trim();
     final content = _contentController.text.trim();
 
-    if (title.isEmpty || content.isEmpty) {
+    if (univ.isEmpty || program.isEmpty || content.isEmpty) {
       setState(() {
-        _errorMessage = '제목과 내용을 입력해주세요.';
+        _errorMessage = '내용을 모두 채워주세요';
       });
       return;
     }
@@ -53,7 +57,7 @@ class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCre
     });
 
     try {
-      await ApiService.createReview(title, content);
+      await ApiService.createReview(univ, program, content);
       Navigator.pop(context); // 작성 후 돌아가기
     } catch (e) {
       setState(() {
@@ -65,21 +69,23 @@ class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCre
 
   @override
   Widget build(BuildContext context) {
-    final double labelFontSize = _isLargeText ? 26 : 20;
-    final double textFieldFontSize = _isLargeText ? 24 : 16;
+    final double labelFontSize = _isLargeText ? 30 : 23;
+    final double textFieldFontSize = _isLargeText ? 30 : 23;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('리뷰 작성', style: TextStyle(fontSize: labelFontSize)),
+        //title: Text('수강 후기', style: TextStyle(fontSize: labelFontSize)),
+        backgroundColor: Color(0xFFE3E5ED),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, size: labelFontSize),
+          icon: Icon(Icons.arrow_back, size: 55),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           Center(
             child: Text(
               '큰 글자',
-              style: TextStyle(fontSize: labelFontSize, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                  fontSize: labelFontSize, fontWeight: FontWeight.w600),
             ),
           ),
           Switch(
@@ -88,8 +94,13 @@ class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCre
               setState(() {
                 _isLargeText = value;
               });
+              // 스위치가 변경될 때 SharedPreferences에 즉시 저장
               _saveLargeTextSetting(value);
             },
+            inactiveThumbColor: Colors.white,
+            inactiveTrackColor: Colors.grey,
+            activeColor: Colors.white,
+            activeTrackColor: Colors.blueAccent,
           ),
           const SizedBox(width: 8),
         ],
@@ -99,6 +110,8 @@ class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCre
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
+              // Color(0xFFB3A3EC),
+              // Color(0xFFDEDBCA),
               Color(0xFFE3E5ED),
               Color(0xFFDADCE2),
             ],
@@ -111,39 +124,57 @@ class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCre
             children: [
               // 스크롤 영역
               SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    if (_errorMessage.isNotEmpty) ...[
-                      Text(
-                        _errorMessage,
-                        style: TextStyle(
-                          fontSize: _isLargeText ? 24 : 16,
-                          color: Colors.red,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 15, vertical: 30),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: MediaQuery.of(context).size.height -
+                        32, // padding(16*2) 고려
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        if (_errorMessage.isNotEmpty) ...[
+                          Text(
+                            _errorMessage,
+                            style: TextStyle(
+                              fontSize: _isLargeText ? 24 : 16,
+                              color: Colors.red,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        _buildNeumorphicTextField(
+                          controller: _univController,
+                          label: '   대학',
+                          fontSize: textFieldFontSize,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    _buildNeumorphicTextField(
-                      controller: _titleController,
-                      label: '제목',
-                      fontSize: textFieldFontSize,
+                        const SizedBox(height: 16),
+                        _buildNeumorphicTextField(
+                          controller: _subjectController,
+                          label: '   과목',
+                          fontSize: textFieldFontSize,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildNeumorphicTextField(
+                          controller: _contentController,
+                          label: '   내용',
+                          fontSize: textFieldFontSize,
+                          maxLines: 10,
+                        ),
+                        const SizedBox(height: 100),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    _buildNeumorphicTextField(
-                      controller: _contentController,
-                      label: '내용',
-                      fontSize: textFieldFontSize,
-                      maxLines: 8,
-                    ),
-                    const SizedBox(height: 100), // 하단 버튼 공간 확보
-                  ],
+                  ),
                 ),
               ),
+
               // 로딩 인디케이터
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator()),
+              if (_isLoading) const Center(child: CircularProgressIndicator()),
 
               // 하단 고정: "등록하기" 버튼
               Positioned(
@@ -166,7 +197,7 @@ class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCre
     required double fontSize,
     int maxLines = 1,
   }) {
-    const baseColor = Color(0xFFE3E5ED);
+    const baseColor = Color.fromARGB(255, 255, 255, 255);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -177,11 +208,6 @@ class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCre
           BoxShadow(
             color: Colors.black.withOpacity(0.2),
             offset: const Offset(4, 4),
-            blurRadius: 10,
-          ),
-          BoxShadow(
-            color: Colors.white.withOpacity(0.7),
-            offset: const Offset(-4, -4),
             blurRadius: 10,
           ),
         ],
@@ -205,7 +231,7 @@ class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCre
     final double buttonWidth = MediaQuery.of(context).size.width * 0.8;
     final double iconSize = _isLargeText ? 28 : 22;
     final double textSize = _isLargeText ? 24 : 18;
-    const baseColor = Color(0xFFE3E5ED);
+    const baseColor = Color(0xffB3A3EC);
 
     return Center(
       child: GestureDetector(
@@ -213,38 +239,41 @@ class _MobileLectureReviewCreateScreenState extends State<MobileLectureReviewCre
           HapticFeedback.mediumImpact();
           _createReview();
         },
-        child: Container(
-          height: buttonHeight,
-          width: buttonWidth,
-          decoration: BoxDecoration(
-            color: baseColor,
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                offset: const Offset(6, 6),
-                blurRadius: 20,
-              ),
-              BoxShadow(
-                color: Colors.white.withOpacity(0.9),
-                offset: const Offset(-6, -6),
-                blurRadius: 20,
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.check, size: iconSize),
-              const SizedBox(width: 8),
-              Text(
-                '등록하기',
-                style: TextStyle(
-                  fontSize: textSize,
-                  fontWeight: FontWeight.bold,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 15),
+          child: Container(
+            height: buttonHeight,
+            width: buttonWidth,
+            decoration: BoxDecoration(
+              color: baseColor,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  offset: const Offset(6, 6),
+                  blurRadius: 20,
                 ),
-              ),
-            ],
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.check,
+                  size: iconSize,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '등록하기',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: textSize,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

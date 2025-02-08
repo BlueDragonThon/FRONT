@@ -7,28 +7,35 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// 강의 리뷰 모델
 class ReviewItem {
   final int id;
-  final String title;
+  final String university;
+  final String program;
   final String content;
   final String writer;
+  final String createdAt;
   final bool isUserCreated;
 
   ReviewItem({
     required this.id,
-    required this.title,
+    required this.university,
+    required this.program,
     required this.content,
     required this.writer,
+    required this.createdAt,
     required this.isUserCreated,
   });
 
-  factory ReviewItem.fromJson(Map<String, dynamic> json) {
-    return ReviewItem(
-      id: json['id'] as int,
-      title: json['title'] as String,
-      content: json['content'] as String,
-      writer: json['writer'] as String,
-      isUserCreated: json['isUserCreated'] as bool,
-    );
-  }
+factory ReviewItem.fromJson(Map<String, dynamic> json) {
+  return ReviewItem(
+    id: json['reviewId'] as int,
+    university: json['university'] as String? ?? "없음",
+    program: json['program'] as String? ?? "없음",
+    content: json['content'] as String? ?? "없음",
+    writer: json['writer'] as String? ?? "없음",
+    createdAt: json['createdAt'] as String? ?? "없음",
+    isUserCreated: json['isUserCreated'] as bool,
+  );
+}
+
 }
 
 /// 알림 아이템 구조 (기존 코드)
@@ -51,7 +58,7 @@ class NotificationItem {
     return NotificationItem(
       id: json['id'] as int,
       userId: json['userId'] as int,
-      title: json['title'] as String,
+      title: json['university'] as String,
       content: json['content'] as String,
       date: json['date'] as String,
     );
@@ -85,9 +92,8 @@ class LikeUnivItem {
       headmaster: json['headmaster'] as String,
       contactInfo: json['contactInfo'] as String,
       address: json['address'] as String,
-      program: (json['program'] as List<dynamic>)
-          .map((p) => p as String)
-          .toList(),
+      program:
+          (json['program'] as List<dynamic>).map((p) => p as String).toList(),
       favorites: json['favorites'] as bool,
     );
   }
@@ -184,7 +190,8 @@ class SignupResult {
 }
 
 class ApiService {
-  static final String baseUrl = dotenv.env['BASE_URL'] ?? 'https://fallback.com';
+  static final String baseUrl =
+      dotenv.env['BASE_URL'] ?? 'https://fallback.com';
 
   /// (기존 예시) 회원가입
   static Future<SignupResponse> signupMember(Map<String, dynamic> body) async {
@@ -307,7 +314,8 @@ class ApiService {
     print(response.body);
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to delete (unfavorite) univ: ${response.statusCode}');
+      throw Exception(
+          'Failed to delete (unfavorite) univ: ${response.statusCode}');
     }
   }
 
@@ -345,17 +353,15 @@ class ApiService {
     }
   }
 
-  static Future<void> createReview(String title, String content) async {
+  static Future<void> createReview(
+      String univ, String program, String content) async {
     final token = await TokenManager.getToken();
     if (token == null) {
       throw Exception('No Token found');
     }
 
     final url = Uri.parse('$baseUrl/api/review/create');
-    final body = {
-      'title': title,
-      'content': content,
-    };
+    final body = {'college': univ, 'program': program, 'content': content};
 
     final response = await http.post(
       url,
@@ -372,7 +378,8 @@ class ApiService {
     }
   }
 
-  static Future<void> updateReview(int reviewId, String title, String content) async {
+  static Future<void> updateReview(
+      int reviewId, String title, String program, String content) async {
     final token = await TokenManager.getToken();
     if (token == null) {
       throw Exception('No Token found');
@@ -381,7 +388,8 @@ class ApiService {
     final url = Uri.parse('$baseUrl/api/review/update');
     final body = {
       'reviewId': reviewId,
-      'title': title,
+      'university': title,
+      'program' : program,
       'content': content,
     };
 
@@ -438,8 +446,8 @@ class ApiService {
 
     // body에 넣어주기
     final body = {
-      'acr': lat,    // 서버 요구사항에 맞게 "acr"가 latitude라고 가정
-      'dwn': lng,    // "dwn"이 longitude라고 가정
+      'acr': lat, // 서버 요구사항에 맞게 "acr"가 latitude라고 가정
+      'dwn': lng, // "dwn"이 longitude라고 가정
       'page': page,
     };
 

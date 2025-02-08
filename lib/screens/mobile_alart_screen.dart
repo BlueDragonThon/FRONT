@@ -6,7 +6,7 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart'; // 추가
 
 class MobileAlertScreen extends StatefulWidget {
-  const MobileAlertScreen({Key? key}) : super(key: key);
+  const MobileAlertScreen({super.key});
 
   @override
   State<MobileAlertScreen> createState() => _MobileAlertScreenState();
@@ -272,11 +272,11 @@ class _NeumorphicNotificationCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   const _NeumorphicNotificationCard({
-    Key? key,
+    super.key,
     required this.notification,
     required this.isLargeText,
     required this.onDelete,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
