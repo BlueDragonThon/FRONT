@@ -22,7 +22,7 @@ class _MobileSplashScreenState extends State<MobileSplashScreen> {
   }
 
   Future<void> _checkUserDataAfterDelay() async {
-    // 실제 사용 시 3초 정도
+    // 실제 사용 시 3초 정도로 늘려도 됨
     await Future.delayed(const Duration(seconds: 2));
 
     final prefs = await SharedPreferences.getInstance();
@@ -37,7 +37,7 @@ class _MobileSplashScreenState extends State<MobileSplashScreen> {
     }
   }
 
-  /// (기존) 이름 설정
+  /// 이름 입력 화면으로 이동
   void _navigateToNameInput() {
     Navigator.pushReplacement(
       context,
@@ -58,6 +58,7 @@ class _MobileSplashScreenState extends State<MobileSplashScreen> {
             animation.value,
           );
 
+          // Hero 전환도 함께 적용되도록 기본적으로 Stack 안에 child가 들어있으면 됩니다.
           return Stack(
             children: [
               Container(
@@ -69,6 +70,7 @@ class _MobileSplashScreenState extends State<MobileSplashScreen> {
                   ),
                 ),
               ),
+              // FadeTransition + Hero
               FadeTransition(
                 opacity: animation,
                 child: child,
@@ -80,10 +82,47 @@ class _MobileSplashScreenState extends State<MobileSplashScreen> {
     );
   }
 
-  /// 메인으로 이동 (Hero 애니메이션)
+  /// 메인으로 이동 (Hero 전환 + 그라데이션 전환)
   void _navigateToMain() {
-    // routes: {'/main': (ctx) => MobileMainScreen()} 라고 등록되어 있으면
-    Navigator.pushReplacementNamed(context, '/main');
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        transitionDuration: const Duration(seconds: 2),
+        pageBuilder: (_, animation, __) => const MobileMainScreen(),
+        transitionsBuilder: (_, animation, __, child) {
+          // 스플래시 배경 -> 메인 배경 그라데이션 보간
+          final bgColor1 = Color.lerp(
+            const Color(0xFFB3A3EC),
+            const Color(0xFFE3E5ED),
+            animation.value,
+          );
+          final bgColor2 = Color.lerp(
+            const Color(0xFFDAD4B6),
+            const Color(0xFFDADCE2),
+            animation.value,
+          );
+
+          return Stack(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [bgColor1!, bgColor2!],
+                  ),
+                ),
+              ),
+              // FadeTransition + Hero
+              FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -95,7 +134,7 @@ class _MobileSplashScreenState extends State<MobileSplashScreen> {
 
         return Stack(
           children: [
-            // (1) 그라데이션
+            // (1) 그라데이션 배경
             Container(
               width: w,
               height: h,
@@ -132,15 +171,42 @@ class _MobileSplashScreenState extends State<MobileSplashScreen> {
                 ],
               ),
             ),
-            // (3) Hero: 오른쪽 큰 원 (출발)
+            // (3) 오른쪽 큰 원 (출발점) - Hero 적용
             Positioned(
               top: 0.075 * h,
               left: 0.3 * w,
               child: Hero(
                 tag: 'transitionCircle',
-                flightShuttleBuilder: (flightCtx, anim, dir, fromCtx, toCtx) {
-                  return _MovingCircleHero(animation: anim);
+                flightShuttleBuilder: (flightContext, animation, flightDirection,
+                    fromHeroContext, toHeroContext) {
+                  if (flightDirection == HeroFlightDirection.pop) {
+                    return toHeroContext.widget;
+                  } else {
+                    final size = MediaQuery.of(flightContext).size;
+                    final double w = size.width * 1.5;
+                    final double h = size.height * 1.5;
+
+                    return AnimatedBuilder(
+                      animation: animation,
+                      builder: (_, __) {
+                        final colorTween = ColorTween(
+                          begin: Colors.white24,
+                          end: Theme.of(flightContext).primaryColor,
+                        );
+
+                        return Container(
+                          width: w,
+                          height: h,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: colorTween.evaluate(animation),
+                          ),
+                        );
+                      },
+                    );
+                  }
                 },
+
                 child: Container(
                   alignment: Alignment.bottomRight,
                   width: 1.5 * w,
@@ -155,50 +221,6 @@ class _MobileSplashScreenState extends State<MobileSplashScreen> {
           ],
         );
       }),
-    );
-  }
-}
-
-/// 원 이동 + 축소 + 페이드
-class _MovingCircleHero extends StatelessWidget {
-  final Animation<double> animation;
-  const _MovingCircleHero({Key? key, required this.animation}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final curved = CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeInOut,
-    );
-
-    return AnimatedBuilder(
-      animation: curved,
-      builder: (ctx, child) {
-        final p = curved.value;
-        final scale = 1.0 - p;
-        final opacity = 1.0 - p;
-        final dx = -0.5 * MediaQuery.of(context).size.width * p;
-        final dy = -0.3 * MediaQuery.of(context).size.height * p;
-
-        return Transform.translate(
-          offset: Offset(dx, dy),
-          child: Transform.scale(
-            scale: scale,
-            child: Opacity(
-              opacity: opacity,
-              child: child,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        width: MediaQuery.of(context).size.width * 1.5,
-        height: MediaQuery.of(context).size.height * 1.5,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white24,
-        ),
-      ),
     );
   }
 }
