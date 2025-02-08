@@ -12,7 +12,6 @@ class UniversityService {
   static Future<List<University>> searchUniversity(
       String searchText, String endpoint) async {
     final Uri url = Uri.parse('$baseUrl$endpoint/$searchText');
-    print("베이스 주소 나오나 $url");
 
     // 실제 API 호출 예시 (주석 처리)
     /*
