@@ -1,3 +1,4 @@
+import 'package:bluedragonthon/screens/reminder.dart';
 import 'package:bluedragonthon/screens/search_gps.dart';
 import 'package:bluedragonthon/screens/search_subject.dart';
 import 'package:bluedragonthon/screens/search_univ.dart';
@@ -30,7 +31,7 @@ class Search extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-                onPressed: () => _navigateTo(context, const SearchUniv()),
+                onPressed: () => _navigateTo(context, const CollegeReminderScreen()),
                 child: const Text('대학 이름 찾기', style: TextStyle(color: Colors.white, fontSize: 45, fontWeight: FontWeight.w700),),
               ),
             ),
