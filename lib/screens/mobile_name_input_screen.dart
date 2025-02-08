@@ -1,11 +1,10 @@
-import 'package:bluedragonthon/screens/search.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // 진동 사용시 필요
 import 'package:shared_preferences/shared_preferences.dart';
 import 'mobile_age_select_screen.dart'; // 나이 화면
 
 class MobileNameInputScreen extends StatefulWidget {
-  const MobileNameInputScreen({super.key});
+  const MobileNameInputScreen({Key? key}) : super(key: key);
 
   @override
   State<MobileNameInputScreen> createState() => _MobileNameInputScreenState();
@@ -91,6 +90,24 @@ class _MobileNameInputScreenState extends State<MobileNameInputScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                /*
+                const Text(
+                  '환영합니다!',
+                  style: TextStyle(
+                    fontSize: 60,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 50),*/
+                const Text(
+                  '이름을 입력해주세요',
+                  style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 48),
+
                 // TextField
                 TextField(
                   controller: _nameController,

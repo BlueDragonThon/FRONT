@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const MobileSplashScreen(),
-        //'/name': (context) => const MobileNameInputScreen(),
+        '/name': (context) => const MobileNameInputScreen(),
         '/age': (context) => const MobileAgeSelectScreen(),
         '/location': (context) => const MobileLocationInputScreen(),
         '/main': (context) => const MobileMainScreen(),

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// 이동할 스크린들 import
+// 나머지 import
 import 'search.dart';
 import 'reminder.dart';
+import 'mobile_alart_screen.dart';
 
 class MobileMainScreen extends StatefulWidget {
   const MobileMainScreen({super.key});
@@ -15,13 +16,10 @@ class MobileMainScreen extends StatefulWidget {
 
 class _MobileMainScreenState extends State<MobileMainScreen> {
   String? userName;
-  int? userAge;         // 더 이상 표시하지 않음
-  String? userLocation; // 더 이상 표시하지 않음
-
-  // '큰 글자 모드' 여부
+  int? userAge;
+  String? userLocation;
   bool _isLargeText = false;
 
-  // 4개 항목 버튼 텍스트와 색상 (순서 유지)
   final List<String> buttonTexts = [
     '대학 찾기',
     '알리미',
@@ -29,15 +27,13 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
     '나의\n관심 대학',
   ];
 
-  // "조금 더 진한" 파스텔 톤
   final List<Color> buttonColors = [
-    const Color(0xFFFFC8D0), // 기존보다 살짝 더 진한 핑크
-    const Color(0xFFFFF5B3), // 노랑
-    const Color(0xFFB7FFBF), // 그린
-    const Color(0xFFB7EEFF), // 블루
+    Color(0xFFFFC8D0),
+    Color(0xFFFFF5B3),
+    Color(0xFFB7FFBF),
+    Color(0xFFB7EEFF),
   ];
 
-  // 버튼 아이콘
   final List<IconData> buttonIcons = [
     Icons.search,
     Icons.notifications,
@@ -76,68 +72,66 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
   void _onButtonTap(int index) {
     HapticFeedback.mediumImpact();
     switch (index) {
-      case 0: // 대학 찾기
+      case 0:
+      // Search 화면 (Hero 삭제됨)
         _navigateTo(context, const Search());
         break;
-      case 1: // 알리미
-        _navigateTo(context, const CollegeReminderScreen());
+      case 1:
+        _navigateTo(context, const MobileAlertScreen());
         break;
-      case 2: // 커뮤니티
+      case 2:
         break;
-      case 3: // 나의 관심 대학
+      case 3:
         break;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 큰 글자 모드에 따라 폰트 크기 달라짐
     final double baseFontSize = _isLargeText ? 40.0 : 30.0;
 
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final screenWidth = constraints.maxWidth;
-          final screenHeight = constraints.maxHeight;
+          final w = constraints.maxWidth;
+          final h = constraints.maxHeight;
 
           return Stack(
             children: [
-              // 배경 그라데이션 (이전보다 조금 더 진한 느낌)
+              // (1) 배경 그라데이션
               Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFFE3E5ED), // 연한 회색
-                      Color(0xFFDADCE2), // 조금 더 진한 회색
-                    ],
+                    colors: [Color(0xFFE3E5ED), Color(0xFFDADCE2)],
                   ),
                 ),
               ),
-              // 스플래시 원(Hero)와 연결된 부분
+              // (2) Hero 도착 지점 (왼쪽 상단, 작게)
               Positioned(
-                top: -0.4 * screenHeight,
-                left: -0.1 * screenWidth, // 왼쪽 바깥
+                top: 60,
+                left: 20,
                 child: Hero(
                   tag: 'transitionCircle',
+                  // flightShuttleBuilder 없음
                   child: Container(
-                    width: 1.6 * screenWidth,
-                    height: 1.6 * screenHeight,
+                    width: 80,
+                    height: 80,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.transparent,
+                      color: Colors.white24,
                     ),
                   ),
                 ),
               ),
+              // (3) 메인 UI
               SafeArea(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 18.0),
                   child: Column(
                     children: [
                       const SizedBox(height: 12),
-                      // 상단: '큰 글자' 스위치
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -168,7 +162,6 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // 사용자 이름
                       if (userName != null && userName!.isNotEmpty)
                         AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 300),
@@ -184,7 +177,6 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                         ),
                       const SizedBox(height: 24),
 
-                      // 2 x 2 버튼
                       GridView.count(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -203,8 +195,6 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                         }),
                       ),
                       const SizedBox(height: 40),
-
-                      // 정보 초기화 버튼
                       SizedBox(
                         width: 320,
                         height: 80,
@@ -240,7 +230,7 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
   }
 }
 
-/// 뉴모피즘 + 그림자 강조
+/// (기존) 뉴모피즘 + 그림자 강조
 class _NeumorphicButton extends StatelessWidget {
   final String text;
   final IconData icon;
@@ -259,7 +249,6 @@ class _NeumorphicButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 큰 글자 변환 애니메이션을 위해 AnimatedDefaultTextStyle 사용
     return InkWell(
       onTap: () {
         HapticFeedback.lightImpact();
@@ -271,7 +260,6 @@ class _NeumorphicButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(24),
-          // 그림자 더 강조
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.2),
@@ -295,7 +283,6 @@ class _NeumorphicButton extends StatelessWidget {
                 color: Colors.black87,
               ),
               const SizedBox(height: 16),
-              // 텍스트가 커졌다 작아지도록 AnimatedDefaultTextStyle
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 300),
                 style: TextStyle(
