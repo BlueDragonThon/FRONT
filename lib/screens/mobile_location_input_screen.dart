@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // 진동
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+
+// 메인 화면 (나중에 넘어갈 때 FadeTransition)
+import 'mobile_main_screen.dart';
+import 'package:bluedragonthon/services/api_service.dart';
+import 'package:bluedragonthon/utils/token_manager.dart';
 
 class MobileLocationInputScreen extends StatefulWidget {
   const MobileLocationInputScreen({Key? key}) : super(key: key);
@@ -11,16 +18,21 @@ class MobileLocationInputScreen extends StatefulWidget {
 }
 
 class _MobileLocationInputScreenState extends State<MobileLocationInputScreen> {
-  // 메인에 표시할, 최종 선택된 주소(읽기 전용)
-  final TextEditingController _finalAddressController =
-  TextEditingController(text: '');
-
-  // 확장된 검색 영역에서 사용할 검색어 컨트롤러
+  final TextEditingController _finalAddressController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
 
-  bool _isSearchExpanded = false; // 검색 영역 보이기/숨기기
-  bool _isSearching = false;      // 검색 중 표시(스피너 등)
-  List<String> _searchResults = [];  // 검색 결과 리스트
+  bool _isSearchView = false;
+  bool _isSearching = false;
+
+  // 기존 검색 결과 목록 (주소 문자열)
+  List<String> _searchResults = [];
+
+  // 새로 추가: 각 검색 결과에 대한 (lat, lng) 정보를 저장
+  final List<Offset> _searchCoords = [];
+
+  // 최종 선택된 위도/경도
+  double _selectedLat = 0.0;
+  double _selectedLng = 0.0;
 
   @override
   void initState() {
@@ -28,117 +40,245 @@ class _MobileLocationInputScreenState extends State<MobileLocationInputScreen> {
     _loadSavedLocation();
   }
 
-  /// SharedPreferences에서 저장된 주소 로드 -> 읽기 전용 필드에 표시
+  // SharedPreferences에서 기존 주소 로드
   Future<void> _loadSavedLocation() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedLocation = prefs.getString('userLocation') ?? '';
+    final saved = prefs.getString('userLocation') ?? '';
     setState(() {
-      _finalAddressController.text = savedLocation;
+      _finalAddressController.text = saved;
     });
+    // 만약 lat/lng가 이미 저장돼있다면 불러올 수도 있음
+    _selectedLat = prefs.getDouble('userLocationLat') ?? 0.0;
+    _selectedLng = prefs.getDouble('userLocationLng') ?? 0.0;
   }
 
-  /// 최종 주소를 SharedPreferences에 저장
-  Future<void> _saveLocation(String address) async {
+  // 위치 정보(이름, 위도, 경도)를 함께 저장
+  Future<void> _saveLocation(String name, double lat, double lng) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('userLocation', address);
+    await prefs.setString('userLocation', name);
+    await prefs.setDouble('userLocationLat', lat);
+    await prefs.setDouble('userLocationLng', lng);
   }
 
-  /// "주소 검색" 버튼 누르면 검색 영역 확장
-  void _toggleSearchPanel() {
+  /// 검색 뷰면 X, 메인 뷰면 뒤로가기
+  void _onBackOrClose() {
+    HapticFeedback.lightImpact();
+    if (_isSearchView) {
+      setState(() {
+        _isSearchView = false;
+        _searchController.clear();
+        _searchResults.clear();
+        _searchCoords.clear();
+      });
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
+  /// "다음" 버튼 -> 메인 화면 (FadeTransition)
+  void _onNext() async {
+    HapticFeedback.lightImpact();
+
+    final addr = _finalAddressController.text.trim();
+    if (addr.isEmpty) {
+      HapticFeedback.mediumImpact();
+      _showSnackBar('거주 지역을 입력해주세요.');
+      return;
+    }
+
+    // 1) 위치 정보(이름, lat, lng) 저장
+    await _saveLocation(addr, _selectedLat, _selectedLng);
+
+    // 2) 회원가입 API 호출 -> 토큰 저장 (예시)
+    try {
+      final signupBody = {
+        "name": addr, // 주소를 name으로 가정
+        "age": 20,
+        "acr": 0,
+        "dwn": 0,
+      };
+
+      final signupResponse = await ApiService.signupMember(signupBody);
+      if (signupResponse.isSuccess && signupResponse.result != null) {
+        await TokenManager.saveToken(signupResponse.result!.token);
+      } else {
+        _showSnackBar('회원가입 실패: ${signupResponse.message}');
+        return; // 여기서 중단
+      }
+    } catch (e) {
+      _showSnackBar('회원가입 중 오류 발생: $e');
+      return; // 여기서 중단
+    }
+
+    // 3) FadeTransition으로 메인으로 이동
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const MobileMainScreen(),
+        transitionDuration: const Duration(milliseconds: 300),
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+  }
+
+  /// 검색 화면 열기
+  void _openSearchView() {
+    HapticFeedback.lightImpact();
     setState(() {
-      _isSearchExpanded = !_isSearchExpanded;
+      _isSearchView = true;
+      _searchController.clear();
+      _searchResults.clear();
+      _searchCoords.clear();
     });
   }
 
-  /// 실제 주소 검색 로직 (여기서는 예시로 더미 데이터 사용)
-  void _onSearch() async {
+  /// 주소 검색 -> 여러 결과 + 각 lat/lng
+  Future<void> _onSearch() async {
+    HapticFeedback.lightImpact();
     final query = _searchController.text.trim();
     if (query.isEmpty) {
-      HapticFeedback.mediumImpact(); // 오류 느낌
+      HapticFeedback.mediumImpact();
       _showSnackBar('검색어를 입력해주세요.');
       return;
     }
     setState(() {
       _isSearching = true;
       _searchResults.clear();
+      _searchCoords.clear();
     });
 
-    // 실제 API 등 호출 대신, 1초 지연 후 "가짜 결과" 표시
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      _isSearching = false;
-      // 더미 예시: 검색어를 포함하는 가짜 주소 목록
-      _searchResults = [
-        '$query 1번가',
-        '$query 2번가',
-        '$query 3번가',
-      ];
-    });
-    HapticFeedback.lightImpact(); // 검색 완료 시 가벼운 진동
+    try {
+      final locations = await locationFromAddress(query);
+      if (locations.isEmpty) {
+        HapticFeedback.mediumImpact();
+        _showSnackBar('검색 결과가 없습니다.');
+        setState(() => _isSearching = false);
+        return;
+      }
+
+      final List<String> foundNames = [];
+      final List<Offset> foundCoords = [];
+
+      for (final loc in locations) {
+        final placemarks = await placemarkFromCoordinates(loc.latitude, loc.longitude);
+        for (final place in placemarks) {
+          final addr = _formatPlacemark(place);
+          if (addr.isNotEmpty) {
+            if (!foundNames.contains(addr)) {
+              foundNames.add(addr);
+              foundCoords.add(Offset(loc.latitude, loc.longitude));
+            }
+          }
+        }
+      }
+
+      if (foundNames.isEmpty) {
+        HapticFeedback.mediumImpact();
+        _showSnackBar('검색 결과가 없습니다.');
+      } else {
+        HapticFeedback.lightImpact();
+      }
+
+      setState(() {
+        _searchResults = foundNames;
+        _searchCoords.addAll(foundCoords);
+        _isSearching = false;
+      });
+    } catch (e) {
+      HapticFeedback.mediumImpact();
+      _showSnackBar('주소 검색 실패. 다시 시도해주세요.');
+      setState(() => _isSearching = false);
+    }
   }
 
-  /// "위치 기반으로 검색" 버튼 예시 (실제 구현은 자유)
-  void _onLocationBasedSearch() async {
+  /// GPS -> 위경도 -> placemarks -> 주소 목록
+  Future<void> _onLocationBasedSearch() async {
     HapticFeedback.lightImpact();
     setState(() {
       _isSearching = true;
       _searchResults.clear();
+      _searchCoords.clear();
     });
-    // 위치 기반 검색 로직(예: GPS, API 연동 등) -> 여기선 더미
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {
-      _isSearching = false;
-      _searchResults = [
-        '내 주변 1번가',
-        '내 주변 2번가',
-        '내 주변 3번가',
-      ];
-    });
-  }
 
-  /// 검색 결과 중 하나 선택 -> 메인 주소 필드에 입력 -> 검색 영역 닫기
-  void _onSelectResult(String selected) {
-    HapticFeedback.lightImpact();
-    setState(() {
-      _finalAddressController.text = selected;
-      _isSearchExpanded = false; // 검색 영역 닫기
-    });
-  }
+    try {
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+        if (perm == LocationPermission.denied) {
+          _showSnackBar('위치 권한이 거부되었습니다.');
+          setState(() => _isSearching = false);
+          return;
+        }
+      }
+      if (perm == LocationPermission.deniedForever) {
+        _showSnackBar('위치 권한이 영구적으로 거부되었습니다. 설정에서 허용해주세요.');
+        setState(() => _isSearching = false);
+        return;
+      }
 
-  /// 뒤로가기 -> 이전 화면
-  void _goBack() {
-    HapticFeedback.lightImpact();
-    Navigator.pop(context);
-  }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      final placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
 
-  /// "다음" 버튼 -> 메인 화면 (예시)
-  void _onNext() async {
-    if (_finalAddressController.text.trim().isEmpty) {
+      final List<String> foundNames = [];
+      final List<Offset> foundCoords = [];
+
+      for (final p in placemarks) {
+        final addr = _formatPlacemark(p);
+        if (addr.isNotEmpty && !foundNames.contains(addr)) {
+          foundNames.add(addr);
+          foundCoords.add(Offset(pos.latitude, pos.longitude));
+        }
+      }
+
+      if (foundNames.isEmpty) {
+        HapticFeedback.mediumImpact();
+        _showSnackBar('현재 위치 검색 결과가 없습니다.');
+      } else {
+        HapticFeedback.lightImpact();
+      }
+      setState(() {
+        _searchResults = foundNames;
+        _searchCoords.addAll(foundCoords);
+        _isSearching = false;
+      });
+    } catch (e) {
       HapticFeedback.mediumImpact();
-      _showSnackBar('거주 지역을 입력해주세요.');
-      return;
+      _showSnackBar('현재 위치를 가져올 수 없습니다. 다시 시도해주세요.');
+      setState(() => _isSearching = false);
     }
-    // 정상
-    HapticFeedback.lightImpact();
-    await _saveLocation(_finalAddressController.text.trim());
+  }
 
-    // 예: FadeTransition으로 메인 화면 이동
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, animation, __) => const _DummyMainScreen(),
-        transitionsBuilder: (_, animation, __, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 300),
-      ),
-    );
+  /// 특정 인덱스의 결과 선택 -> 메인 주소 필드 + lat/lng
+  void _onSelectResultIndex(int index) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _finalAddressController.text = _searchResults[index];
+      _selectedLat = _searchCoords[index].dx; // lat
+      _selectedLng = _searchCoords[index].dy; // lng
+      _isSearchView = false;
+    });
+  }
+
+  /// Placemark -> 문자열
+  String _formatPlacemark(Placemark place) {
+    final parts = [
+      place.country,
+      place.administrativeArea,
+      place.subAdministrativeArea,
+      place.locality,
+      place.thoroughfare,
+      place.subThoroughfare,
+    ];
+    final valid = parts.where((p) => p != null && p.isNotEmpty).toList();
+    return valid.join(' ');
   }
 
   void _showSnackBar(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -148,131 +288,27 @@ class _MobileLocationInputScreenState extends State<MobileLocationInputScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            // (1) 메인 콘텐츠
+            // AnimatedSwitcher로 메인 / 검색 뷰 교체
             GestureDetector(
               onTap: () => FocusScope.of(context).unfocus(),
               behavior: HitTestBehavior.translucent,
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      '어디에 사시나요?',
-                      style: TextStyle(
-                        fontSize: 40,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 48),
-
-                    // 읽기 전용 주소 필드 + "주소 검색" 버튼
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _finalAddressController,
-                            readOnly: true, // 수정 불가
-                            style: const TextStyle(fontSize: 25),
-                            decoration: InputDecoration(
-                              hintText: '주소를 선택하세요',
-                              hintStyle: const TextStyle(
-                                color: Colors.black54,
-                                fontSize: 25,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(32.0),
-                                borderSide: BorderSide(
-                                  color: Colors.grey.shade300,
-                                  width: 2,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(32.0),
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // "주소 검색" 버튼
-                        ElevatedButton(
-                          onPressed: _toggleSearchPanel,
-                          style: ElevatedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(32.0),
-                            ),
-                            backgroundColor: Theme.of(context).primaryColor,
-                            minimumSize: const Size(80, 60),
-                          ),
-                          child: const Text(
-                            '검색',
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 48),
-
-                    // "다음" 버튼 (원형, Hero)
-                    Hero(
-                      tag: 'transitionCircle',
-                      child: SizedBox(
-                        width: 80,
-                        height: 80,
-                        child: ElevatedButton(
-                          onPressed: _onNext,
-                          style: ElevatedButton.styleFrom(
-                            shape: const CircleBorder(),
-                            backgroundColor: Theme.of(context).primaryColor,
-                            elevation: 0,
-                          ),
-                          child: const Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 32,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _isSearchView ? _buildSearchView() : _buildMainView(),
               ),
             ),
 
-            // (2) 뒤로가기 버튼
+            // 왼쪽 상단 아이콘
             Positioned(
               top: 5,
               left: 10,
               child: IconButton(
-                icon: const Icon(Icons.arrow_back, size: 50),
-                onPressed: _goBack,
-              ),
-            ),
-
-            // (3) 검색 영역 (AnimatedCrossFade 또는 AnimatedSwitcher)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              // AnimatedCrossFade를 사용해 패널을 펼치거나 숨김
-              child: AnimatedCrossFade(
-                duration: const Duration(milliseconds: 300),
-                crossFadeState: _isSearchExpanded
-                    ? CrossFadeState.showFirst
-                    : CrossFadeState.showSecond,
-                firstChild: _buildSearchPanel(), // 펼쳐진 검색 영역
-                secondChild: const SizedBox.shrink(), // 빈 공간
+                icon: Icon(
+                  _isSearchView ? Icons.close : Icons.arrow_back,
+                  size: 50,
+                  color: Colors.black,
+                ),
+                onPressed: _onBackOrClose,
               ),
             ),
           ],
@@ -281,138 +317,216 @@ class _MobileLocationInputScreenState extends State<MobileLocationInputScreen> {
     );
   }
 
-  /// 펼쳐진 검색 영역 UI
-  Widget _buildSearchPanel() {
+  /// 메인(주소 필드 + 다음버튼)
+  Widget _buildMainView() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16.0),
-      child: SafeArea(
+      key: const ValueKey('MainView'),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Center(
         child: Column(
-          mainAxisSize: MainAxisSize.min, // 내용만큼 높이
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const Text(
+              '어디에 사시나요?',
+              style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 48),
+
             Row(
               children: [
-                // 검색어 입력
                 Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(fontSize: 20),
-                    decoration: InputDecoration(
-                      hintText: '검색어 입력',
-                      hintStyle: const TextStyle(
-                        color: Colors.black54,
-                        fontSize: 18,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(32.0),
-                        borderSide: BorderSide(
-                          color: Colors.grey.shade300,
-                          width: 2,
+                  child: SizedBox(
+                    height: 60,
+                    child: TextField(
+                      controller: _finalAddressController,
+                      readOnly: true,
+                      style: const TextStyle(fontSize: 25),
+                      decoration: InputDecoration(
+                        hintText: '주소를 선택하세요',
+                        hintStyle: const TextStyle(
+                          color: Colors.black54,
+                          fontSize: 25,
                         ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(32.0),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).primaryColor,
-                          width: 2,
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(32.0),
+                          borderSide:
+                          const BorderSide(width: 2, color: Colors.grey),
                         ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(32.0),
+                          borderSide: BorderSide(
+                            width: 2,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                // "검색" 버튼
-                ElevatedButton(
-                  onPressed: _onSearch,
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(32.0),
+                SizedBox(
+                  height: 60,
+                  child: ElevatedButton(
+                    onPressed: _openSearchView,
+                    style: ElevatedButton.styleFrom(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(32.0),
+                      ),
+                      backgroundColor: Theme.of(context).primaryColor,
+                      fixedSize: const Size(100, 60),
                     ),
-                    backgroundColor: Theme.of(context).primaryColor,
-                    minimumSize: const Size(80, 48),
-                  ),
-                  child: const Text(
-                    '검색',
-                    style: TextStyle(fontSize: 18),
+                    child: const Text(
+                      '검색',
+                      style: TextStyle(fontSize: 20, color: Colors.white),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            // 위치 기반으로 검색 (요청 사항에 따라 남겨둔 버튼)
-            ElevatedButton(
-              onPressed: _onLocationBasedSearch,
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(32.0),
+            const SizedBox(height: 48),
+
+            // 다음 버튼 (원형, Hero)
+            Hero(
+              tag: 'transitionCircle',
+              child: SizedBox(
+                width: 80,
+                height: 80,
+                child: ElevatedButton(
+                  onPressed: _onNext,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    shape: const CircleBorder(),
+                    backgroundColor: Theme.of(context).primaryColor,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 32,
+                    color: Colors.white,
+                  ),
                 ),
-                backgroundColor: Colors.grey.shade200,
-                elevation: 0,
-                minimumSize: const Size(double.infinity, 48),
-              ),
-              child: const Text(
-                '위치 기반으로 검색',
-                style: TextStyle(fontSize: 18, color: Colors.black87),
               ),
             ),
-            const SizedBox(height: 16),
-
-            // 검색 결과 리스트
-            if (_isSearching)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(12.0),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else if (_searchResults.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(12.0),
-                child: Text(
-                  '검색 결과가 없습니다.',
-                  style: TextStyle(fontSize: 16),
-                ),
-              )
-            else
-            // 결과 리스트
-              SizedBox(
-                height: 200, // 예시 높이
-                child: ListView.builder(
-                  itemCount: _searchResults.length,
-                  itemBuilder: (context, index) {
-                    final item = _searchResults[index];
-                    return ListTile(
-                      title: Text(item, style: const TextStyle(fontSize: 18)),
-                      onTap: () => _onSelectResult(item),
-                    );
-                  },
-                ),
-              ),
           ],
         ),
       ),
     );
   }
-}
 
-// 메인 화면 예시
-class _DummyMainScreen extends StatelessWidget {
-  const _DummyMainScreen({Key? key}) : super(key: key);
+  /// 검색 뷰
+  Widget _buildSearchView() {
+    return Container(
+      key: const ValueKey('SearchView'),
+      color: Colors.white,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 70),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 50,
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(fontSize: 22),
+                    decoration: InputDecoration(
+                      hintText: '검색어 입력',
+                      hintStyle:
+                      const TextStyle(color: Colors.black54, fontSize: 20),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(32.0),
+                        borderSide:
+                        const BorderSide(width: 2, color: Colors.grey),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(32.0),
+                        borderSide: BorderSide(
+                          width: 2,
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      ),
+                      contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _onSearch,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(32.0),
+                    ),
+                    backgroundColor: Theme.of(context).primaryColor,
+                    fixedSize: const Size(80, 50),
+                  ),
+                  child: const Text(
+                    '검색',
+                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Text(
-          '메인 화면',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
+          SizedBox(
+            height: 50,
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _onLocationBasedSearch,
+              icon: const Icon(Icons.gps_fixed, color: Colors.black87),
+              label: const Text(
+                '위치 기반으로 검색',
+                style: TextStyle(fontSize: 18, color: Colors.black87),
+              ),
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(32.0),
+                ),
+                backgroundColor: Colors.grey.shade200,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Expanded(child: _buildSearchResults()),
+        ],
       ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_isSearching) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_searchResults.isEmpty) {
+      return const Center(
+        child: Text('검색 결과가 없습니다.', style: TextStyle(fontSize: 18)),
+      );
+    }
+    return ListView.builder(
+      itemCount: _searchResults.length,
+      itemBuilder: (context, idx) {
+        final item = _searchResults[idx];
+        return ListTile(
+          title: Text(item, style: const TextStyle(fontSize: 20)),
+          onTap: () => _onSelectResultIndex(idx),
+        );
+      },
     );
   }
 }
