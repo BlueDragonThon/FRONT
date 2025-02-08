@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// 이동할 스크린들 import (직접 사용하실 때 import 경로를 맞춰주세요)
+import 'search.dart'; // 대학 찾기(첫 번째 버튼)
+import 'reminder.dart'; // 알리미(두 번째 버튼)
+// 나머지 두 버튼(커뮤니티, 나의 관심 대학)은 기존대로 유지한다면 별도 이동 코드/화면이 없거나 기존과 동일
+
 class MobileMainScreen extends StatefulWidget {
   const MobileMainScreen({Key? key}) : super(key: key);
 
@@ -10,10 +15,10 @@ class MobileMainScreen extends StatefulWidget {
 
 class _MobileMainScreenState extends State<MobileMainScreen> {
   String? userName;
-  int? userAge;
-  String? userLocation;
+  int? userAge;         // 더 이상 표시하지 않음
+  String? userLocation; // 더 이상 표시하지 않음
 
-  // 4개 항목 버튼 텍스트와 색상
+  // 4개 항목 버튼 텍스트와 색상 (순서 유지)
   final List<String> buttonTexts = [
     '대학 찾기',
     '알리미',
@@ -51,36 +56,53 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
     Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
 
+  // 버튼 클릭 시 스크린 이동 로직 (필요에 따라 추가/수정)
+  void _navigateTo(BuildContext context, Widget screen) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => screen),
+    );
+  }
+
+  // 버튼별로 동작을 분기하기 위해 함수 생성 (필요하다면)
+  void _onButtonTap(int index) {
+    switch (index) {
+      case 0: // '대학 찾기'
+        _navigateTo(context, const Search());
+        break;
+      case 1: // '알리미'
+        _navigateTo(context, const CollegeReminderScreen());
+        break;
+      case 2: // '커뮤니티'
+      // 기존 로직을 유지하거나 원하는 화면으로 이동
+        break;
+      case 3: // '나의 관심 대학'
+      // 기존 로직을 유지하거나 원하는 화면으로 이동
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // AppBar가 필요 없다면 삭제 가능
       body: SafeArea(
-        child: Padding(
+        // 내용이 많아질 경우 스크롤 가능하도록 변경
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             children: [
-              // 메인 화면 제목: 글자 크기 확대
-              Text(
-                '메인 화면',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // 사용자 정보: 글자 크기 확대
-              if (userName != null && userAge != null && userLocation != null)
+              // 상단: 이름만 표시
+              if (userName != null && userName!.isNotEmpty)
                 Text(
-                  '$userName 님, 안녕하세요!\n나이: $userAge\n지역: $userLocation',
+                  '$userName 님 안녕하세요!',
                   style: const TextStyle(
-                    fontSize: 24,
-                    height: 1.4,
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
                   ),
                   textAlign: TextAlign.center,
                 ),
               const SizedBox(height: 24),
-              // 2열 그리드로 4개 버튼 배치
+              // 버튼들을 2열 그리드로 배치
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -88,15 +110,15 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                 mainAxisSpacing: 20,
                 crossAxisSpacing: 20,
                 children: List.generate(buttonTexts.length, (index) {
-                  return ModernButtonWidget(
+                  return _ModernButtonWidget(
                     text: buttonTexts[index],
                     color: buttonColors[index],
-                    height: 120,
+                    onTap: () => _onButtonTap(index),
                   );
                 }),
               ),
-              const Spacer(),
-              // 하단의 정보 초기화 버튼 (기능 그대로 유지)
+              const SizedBox(height: 40),
+              // 정보 초기화 버튼
               SizedBox(
                 width: 250,
                 height: 60,
@@ -105,11 +127,15 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
                     textStyle: const TextStyle(
-                      fontSize: 22,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white, // 버튼 텍스트 흰색
                     ),
                   ),
-                  child: const Text('정보 초기화'),
+                  child: const Text(
+                    '정보 초기화',
+                    style: TextStyle(color: Colors.white), // 추가로 명시
+                  ),
                 ),
               ),
             ],
@@ -120,27 +146,26 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
   }
 }
 
-/// 버튼 스타일 위젯 (동작은 미구현)
-class ModernButtonWidget extends StatelessWidget {
+/// 버튼 스타일 위젯
+class _ModernButtonWidget extends StatelessWidget {
   final String text;
   final Color color;
-  final double height;
+  final VoidCallback? onTap;
 
-  const ModernButtonWidget({
+  const _ModernButtonWidget({
     Key? key,
     required this.text,
     required this.color,
-    this.height = 120,
+    this.onTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // 그림자와 그라데이션을 제거하고, 단색 배경 + 테두리만 간단히 적용
+    // 그림자, 그라데이션 제거 + 단색 배경
     return InkWell(
-      onTap: () {}, // 버튼 동작 미구현
+      onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: height,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: color,
@@ -152,7 +177,7 @@ class ModernButtonWidget extends StatelessWidget {
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.black, // 가독성을 위해 검정색
+              color: Colors.black, // 파스텔톤 배경 대비 검정색 텍스트
             ),
             textAlign: TextAlign.center,
           ),
