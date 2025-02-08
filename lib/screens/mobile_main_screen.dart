@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // 진동 피드백을 위해 필요
 import 'package:shared_preferences/shared_preferences.dart';
 
 // 이동할 스크린들 import (직접 사용하실 때 import 경로를 맞춰주세요)
 import 'search.dart'; // 대학 찾기(첫 번째 버튼)
 import 'reminder.dart'; // 알리미(두 번째 버튼)
-// 나머지 두 버튼(커뮤니티, 나의 관심 대학)은 기존대로 유지한다면 별도 이동 코드/화면이 없거나 기존과 동일
 
 class MobileMainScreen extends StatefulWidget {
   const MobileMainScreen({Key? key}) : super(key: key);
@@ -18,12 +18,15 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
   int? userAge;         // 더 이상 표시하지 않음
   String? userLocation; // 더 이상 표시하지 않음
 
+  // '큰 글자 모드' 여부
+  bool _isLargeText = false;
+
   // 4개 항목 버튼 텍스트와 색상 (순서 유지)
   final List<String> buttonTexts = [
     '대학 찾기',
     '알리미',
     '커뮤니티',
-    '나의 관심 대학',
+    '나의\n관심 대학',
   ];
 
   final List<Color> buttonColors = [
@@ -31,6 +34,14 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
     const Color(0xFFFFF4B2),
     const Color(0xFFB2FFC1),
     const Color(0xFFB2E6FF),
+  ];
+
+  // 버튼에 사용할 아이콘 (순서 동일하게)
+  final List<IconData> buttonIcons = [
+    Icons.search,         // 대학 찾기
+    Icons.notifications,  // 알리미
+    Icons.groups,         // 커뮤니티
+    Icons.favorite,       // 나의 관심 대학
   ];
 
   @override
@@ -56,7 +67,7 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
     Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
 
-  // 버튼 클릭 시 스크린 이동 로직 (필요에 따라 추가/수정)
+  // 버튼 클릭 시 스크린 이동 로직
   void _navigateTo(BuildContext context, Widget screen) {
     Navigator.push(
       context,
@@ -64,8 +75,11 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
     );
   }
 
-  // 버튼별로 동작을 분기하기 위해 함수 생성 (필요하다면)
+  // 버튼별로 동작을 분기
   void _onButtonTap(int index) {
+    // 먼저 진동 피드백
+    HapticFeedback.mediumImpact();
+
     switch (index) {
       case 0: // '대학 찾기'
         _navigateTo(context, const Search());
@@ -74,67 +88,116 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
         _navigateTo(context, const CollegeReminderScreen());
         break;
       case 2: // '커뮤니티'
-      // 기존 로직을 유지하거나 원하는 화면으로 이동
+      // 기존 로직 유지 or 추가 화면
         break;
       case 3: // '나의 관심 대학'
-      // 기존 로직을 유지하거나 원하는 화면으로 이동
+      // 기존 로직 유지 or 추가 화면
         break;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // 글자 크기를 토글할 때 사용될 폰트 사이즈
+    final double baseFontSize = _isLargeText ? 40.0 : 30.0;
+
     return Scaffold(
+      // AppBar에 title을 없애고, 오른쪽에만 큰 글자 모드 스위치 표시
+      appBar: AppBar(
+        elevation: 0,
+        title: null, // 메인화면 텍스트 제거
+        centerTitle: false,
+        actions: [
+          Row(
+            children: [
+              Text(
+                '큰 글자',
+                style: TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+              SizedBox(width: 3,),
+              Switch(
+                value: _isLargeText,
+                onChanged: (value) {
+                  setState(() {
+                    _isLargeText = value;
+                  });
+                },
+                // 토글이 항상 보이도록 트랙 색상 지정
+                inactiveThumbColor: Colors.white,
+                inactiveTrackColor: Colors.grey,
+                activeColor: Colors.white,
+                activeTrackColor: Colors.blueAccent,
+              ),
+              const SizedBox(width: 12),
+            ],
+          ),
+        ],
+      ),
       body: SafeArea(
         // 내용이 많아질 경우 스크롤 가능하도록 변경
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.fromLTRB(18.0, 0, 18, 0),
           child: Column(
             children: [
-              // 상단: 이름만 표시
+              // 상단: 이름만 표시(있을 경우)
               if (userName != null && userName!.isNotEmpty)
                 Text(
                   '$userName 님 안녕하세요!',
-                  style: const TextStyle(
-                    fontSize: 30,
+                  style: TextStyle(
+                    fontSize: baseFontSize + 6,  // 이름은 좀 더 크게
                     fontWeight: FontWeight.bold,
                   ),
                   textAlign: TextAlign.center,
                 ),
               const SizedBox(height: 24),
+
               // 버튼들을 2열 그리드로 배치
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 2,
-                mainAxisSpacing: 20,
-                crossAxisSpacing: 20,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                // childAspectRatio가 작을수록 세로로 길어짐
+                // 더 크게 보이도록 0.7 ~ 0.8 정도로 설정
+                childAspectRatio: 0.7,
                 children: List.generate(buttonTexts.length, (index) {
-                  return _ModernButtonWidget(
+                  return _SeniorFriendlyButton(
                     text: buttonTexts[index],
+                    icon: buttonIcons[index],
                     color: buttonColors[index],
+                    fontSize: baseFontSize,
                     onTap: () => _onButtonTap(index),
                   );
                 }),
               ),
               const SizedBox(height: 40),
+
               // 정보 초기화 버튼
               SizedBox(
-                width: 250,
-                height: 60,
+                width: 320,
+                height: 80,
                 child: ElevatedButton(
-                  onPressed: _resetData,
+                  onPressed: () {
+                    // 진동 피드백
+                    HapticFeedback.heavyImpact();
+                    _resetData();
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
-                    textStyle: const TextStyle(
-                      fontSize: 20,
+                    textStyle: TextStyle(
+                      fontSize: baseFontSize,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white, // 버튼 텍스트 흰색
+                      color: Colors.white,
                     ),
                   ),
                   child: const Text(
                     '정보 초기화',
-                    style: TextStyle(color: Colors.white), // 추가로 명시
+                    style: TextStyle(color: Colors.white),
                   ),
                 ),
               ),
@@ -146,40 +209,59 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
   }
 }
 
-/// 버튼 스타일 위젯
-class _ModernButtonWidget extends StatelessWidget {
+/// 노인 친화적 버튼 스타일 위젯
+class _SeniorFriendlyButton extends StatelessWidget {
   final String text;
+  final IconData icon;
   final Color color;
   final VoidCallback? onTap;
+  final double fontSize;
 
-  const _ModernButtonWidget({
+  const _SeniorFriendlyButton({
     Key? key,
     required this.text,
+    required this.icon,
     required this.color,
     this.onTap,
+    required this.fontSize,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // 그림자, 그라데이션 제거 + 단색 배경
+    // 노인 친화적: 버튼 자체 크기를 크게 하고, 여백을 많이 줌
     return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        // 버튼 눌렀을 때 진동 피드백
+        HapticFeedback.lightImpact();
+        onTap?.call();
+      },
+      borderRadius: BorderRadius.circular(24),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24),
         ),
         child: Center(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black, // 파스텔톤 배경 대비 검정색 텍스트
-            ),
-            textAlign: TextAlign.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: fontSize + 16, // 텍스트보다 더 크게
+                color: Colors.black87,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                text,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),
