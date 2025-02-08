@@ -22,7 +22,7 @@ class UniversityListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ListTile(
@@ -36,32 +36,57 @@ class UniversityListItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            // 전화번호 터치 시 전화 앱으로 연결
-            InkWell(
-              onTap: () async {
-                final String phoneNumber =
-                    university.contactInfo.replaceAll('-', '');
-                final Uri telUri = Uri(scheme: 'tel', path: phoneNumber);
-                await _launchUrl(telUri);
-              },
-              child: Text(
-                university.contactInfo,
-                style: const TextStyle(
-                  fontSize: 20,
-                  color: Colors.blue,
-                  decoration: TextDecoration.underline,
+            Row(
+              children: [
+                Text(
+                  '전화번호',
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.w600),
                 ),
-              ),
+                // 전화번호 터치 시 전화 앱으로 연결
+                SizedBox(
+                  width: 10,
+                ),
+                InkWell(
+                  onTap: () async {
+                    final String phoneNumber =
+                        university.contactInfo.replaceAll('-', '');
+                    final Uri telUri = Uri(scheme: 'tel', path: phoneNumber);
+                    await _launchUrl(telUri);
+                  },
+                  child: Text(
+                    university.contactInfo,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      color: Colors.blue,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 10),
+            Text(
+              '주소',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            ),
             Text(
               university.address,
               style: const TextStyle(fontSize: 20),
             ),
+            SizedBox(
+              height: 10,
+            ),
             const SizedBox(height: 4),
             Text(
-              '프로그램: ${university.program.join(", ")}',
-              style: const TextStyle(fontSize: 20),
+              '프로그램',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            ),
+            Text(
+              university.program.join(", "),
+              style: const TextStyle(
+                fontSize: 20,
+              ),
             ),
           ],
         ),

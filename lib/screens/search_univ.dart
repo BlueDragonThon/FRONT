@@ -36,7 +36,7 @@ class _SearchUnivState extends State<SearchUniv> {
 
     try {
       // 대학 이름 검색 API: 세부 주소로 '/university/search' 전달
-      final results = await UniversityService.searchUniversity(searchText, '/api/collage/name');
+      final results = await UniversityService.searchUniversity(searchText, '/api/college/name');
       setState(() {
         _searchResults = results;
       });
@@ -78,11 +78,8 @@ class _SearchUnivState extends State<SearchUniv> {
   Widget build(BuildContext context) {
     // 기존의 UI 구성...
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("대학교 검색"),
-      ),
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
         child: Column(
           children: [
             const Text(

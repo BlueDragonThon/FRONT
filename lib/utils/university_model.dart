@@ -1,4 +1,5 @@
-// university_model.dart
+import 'dart:ffi';
+
 class University {
   final int id;
   final String name;
@@ -18,12 +19,15 @@ class University {
 
   factory University.fromJson(Map<String, dynamic> json) {
     return University(
-      id: json['id'],
-      name: json['name'],
-      contactInfo: json['contactInfo'],
-      address: json['address'],
-      isHeart: json['isHeart'],
-      program: List<String>.from(json['program'] ?? []),
+      id: json['id'] as int,
+      name: json['name'] as String,
+      contactInfo: json['contactInfo'] as String,
+      address: json['address'] as String,
+      isHeart: json['isHeart'] ?? false, // null이면 false 할당
+      program: (json['program'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
     );
   }
 }

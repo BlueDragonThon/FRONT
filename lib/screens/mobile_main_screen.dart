@@ -7,7 +7,7 @@ import 'search.dart';
 import 'reminder.dart';
 
 class MobileMainScreen extends StatefulWidget {
-  const MobileMainScreen({Key? key}) : super(key: key);
+  const MobileMainScreen({super.key});
 
   @override
   State<MobileMainScreen> createState() => _MobileMainScreenState();
@@ -249,13 +249,13 @@ class _NeumorphicButton extends StatelessWidget {
   final double fontSize;
 
   const _NeumorphicButton({
-    Key? key,
+    super.key,
     required this.text,
     required this.icon,
     required this.color,
     this.onTap,
     required this.fontSize,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
