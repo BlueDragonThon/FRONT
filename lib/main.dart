@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'screens/mobile_splash_screen.dart';
 import 'screens/mobile_name_input_screen.dart';
 import 'screens/mobile_age_select_screen.dart';
