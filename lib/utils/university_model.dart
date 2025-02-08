@@ -5,16 +5,16 @@ class University {
   final String name;
   final String contactInfo;
   final String address;
-  final bool isHeart;
   final List<String> program;
+  final bool isHeart;
 
   University({
     required this.id,
     required this.name,
     required this.contactInfo,
     required this.address,
-    required this.isHeart,
     required this.program,
+    required this.isHeart,
   });
 
   factory University.fromJson(Map<String, dynamic> json) {
@@ -23,11 +23,11 @@ class University {
       name: json['name'] as String,
       contactInfo: json['contactInfo'] as String,
       address: json['address'] as String,
-      isHeart: json['isHeart'] ?? false, // null이면 false 할당
-      program: (json['program'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
+      program: (json['program'] as List<dynamic>)
+          .map((e) => e.toString())
+          .toList(),
+      // 서버 응답에서 "favorites" 라는 boolean
+      isHeart: json['favorites'] == true,
     );
   }
 }

@@ -9,6 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart'; // <-- HapticFeedback을 사용하려면 추가
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math'; // 랜덤 뽑기용
+import 'package:bluedragonthon/services/api_service.dart';
+
 
 class Search extends StatefulWidget {
   const Search({Key? key}) : super(key: key);
@@ -51,36 +54,62 @@ class _SearchState extends State<Search> {
   int _currentPage = 0;
 
   /// 예시 데이터 (실제로는 fetchCollegeInfo() 결과를 받아올 수 있음)
-  final List<Map<String, String>> _collegeList = [
-    {
-      'collegeName': '중앙대학교',
-      'subjectName': '소프트웨어학부',
-      'phone': '010-2797-1090',
-      'email': 'sy020527@naver.com',
-      'website': 'https://www.cau.ac.kr',
-    },
-    {
-      'collegeName': '서울대학교',
-      'subjectName': '컴퓨터공학부',
-      'phone': '02-880-1234',
-      'email': 'info@snu.ac.kr',
-      'website': 'https://www.snu.ac.kr',
-    },
-    {
-      'collegeName': '카이스트',
-      'subjectName': '전산학부',
-      'phone': '042-350-1234',
-      'email': 'info@kaist.ac.kr',
-      'website': 'https://www.kaist.ac.kr',
-    },
-  ];
+  List<Map<String, String>> _collegeList = [];
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    _fetchCollegeData(); // <-- API에서 데이터 불러오기
     // 초기 자동 슬라이드 시작
     _startAutoSlide();
+  }
+
+  /// 서버에서 데이터 불러오는 함수
+  Future<void> _fetchCollegeData() async {
+    try {
+      // 1) API 호출
+      final response = await ApiService.searchCollege(page: 0);
+      final allItems = response.result.result; // List<LikeUnivItem>
+
+      if (allItems.isEmpty) {
+        // 빈 리스트라면 처리
+        print('No colleges found');
+        return;
+      }
+
+      // 2) 랜덤으로 4개만 추출
+      final random = Random();
+      final temp = [...allItems]; // 복사본
+      final chosen = <LikeUnivItem>[];
+
+      // 최대 4개, temp가 비지 않는 동안
+      for (int i = 0; i < 4 && temp.isNotEmpty; i++) {
+        final idx = random.nextInt(temp.length);
+        chosen.add(temp.removeAt(idx));
+      }
+
+      // 3) UI에서 쓰기 편하도록 Map<String,String> 변환
+      //    (프로그램(program) 등 다른 필드도 원하시면 적절히 가공)
+      final mapped = chosen.map((item) {
+        return {
+          'collegeName': item.name,
+          'subjectName': item.program.isNotEmpty
+              ? item.program.join(', ')
+              : '정보 없음',
+          'phone': item.contactInfo,
+          'email': item.headmaster,
+          'website': item.address,
+        };
+      }).toList();
+
+      // 4) 상태 갱신
+      setState(() {
+        _collegeList = mapped;
+      });
+    } catch (e) {
+      print('Error fetching colleges: $e');
+    }
   }
 
   @override

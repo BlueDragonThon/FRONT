@@ -1,3 +1,5 @@
+import 'package:bluedragonthon/screens/mobile_lecture_review.dart';
+import 'package:bluedragonthon/screens/mobile_like_univ_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -88,10 +90,10 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
         _navigateTo(context, const MobileAlertScreen());
         break;
       case 2:
-      // 커뮤니티
+        _navigateTo(context, const MobileLectureReviewScreen());
         break;
       case 3:
-      // 나의 관심 대학
+        _navigateTo(context, const MobileLikeUnivListScreen());
         break;
     }
   }
@@ -222,7 +224,7 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                           final List<String> buttonTexts = [
                             '대학 찾기',
                             '알리미',
-                            '커뮤니티',
+                            '수강후기',
                             '나의\n관심 대학',
                           ];
                           final List<Color> buttonColors = [

@@ -1,20 +1,23 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:bluedragonthon/services/search_api_service.dart';
 import 'package:bluedragonthon/utils/university_model.dart';
 import 'package:bluedragonthon/widgets/university_widgets.dart';
-import 'package:flutter/material.dart';
 
 class SearchUniv extends StatefulWidget {
-  const SearchUniv({super.key});
+  const SearchUniv({Key? key}) : super(key: key);
 
   @override
-  _SearchUnivState createState() => _SearchUnivState();
+  State<SearchUniv> createState() => _SearchUnivState();
 }
 
 class _SearchUnivState extends State<SearchUniv> {
   final TextEditingController _nameController = TextEditingController();
+
+  bool _searched = false;         // 검색 버튼 눌렀는지 여부
+  bool _isLoading = false;        // 로딩 상태
+  String? _error;                 // 에러 메시지
   List<University> _searchResults = [];
-  bool _isLoading = false;
-  String? _error;
 
   @override
   void dispose() {
@@ -22,19 +25,36 @@ class _SearchUnivState extends State<SearchUniv> {
     super.dispose();
   }
 
-  /// 검색 API 호출 (기존 로직 그대로 유지)
+  /// 좌상단 아이콘: 검색 중이면 X, 아니면 뒤로가기
+  void _onBackOrClose() {
+    HapticFeedback.lightImpact();
+    if (_searched) {
+      // 검색 초기화
+      setState(() {
+        _searched = false;
+        _searchResults.clear();
+        _nameController.clear();
+        _error = null;
+        _isLoading = false;
+      });
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
+  /// (수정 금지) 실제 검색 로직
   Future<void> _searchUniversity() async {
     final String searchText = _nameController.text.trim();
     if (searchText.isEmpty) return;
 
     setState(() {
+      _searched = true; // 버튼 누르면 상단으로 이동
       _isLoading = true;
       _error = null;
       _searchResults = [];
     });
 
     try {
-      // 대학 이름 검색 API: 세부 주소로 '/api/college/name' 전달
       final results = await UniversityService.searchUniversity(
         searchText,
         '/api/college/name',
@@ -53,13 +73,13 @@ class _SearchUnivState extends State<SearchUniv> {
     }
   }
 
-  /// 하트 토글 (기존 로직 그대로 유지)
+  /// (수정 금지) 하트 토글
   Future<void> _toggleHeart(University univ) async {
     print('토글 요청: 대학 ID = ${univ.id}');
     try {
-      final newState =
-      await UniversityService.toggleHeart(univ.id, univ.isHeart);
+      final newState = await UniversityService.toggleHeart(univ.id, univ.isHeart);
       setState(() {
+        // 현재 리스트 갱신
         _searchResults = _searchResults.map((u) {
           if (u.id == univ.id) {
             return University(
@@ -67,8 +87,8 @@ class _SearchUnivState extends State<SearchUniv> {
               name: u.name,
               contactInfo: u.contactInfo,
               address: u.address,
-              isHeart: newState,
               program: u.program,
+              isHeart: newState,
             );
           }
           return u;
@@ -81,173 +101,162 @@ class _SearchUnivState extends State<SearchUniv> {
 
   @override
   Widget build(BuildContext context) {
-    final bool hasResults = _searchResults.isNotEmpty;
-
     return Scaffold(
+      // 키보드 열려도 화면 자체는 그대로 (search bar 위치 고정)
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // 검색 영역
-            // AnimatedContainer로 높이와 정렬을 자연스럽게 전환
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              // 검색 결과가 없을 때는 중앙에 크게 위치시킴,
-              // 결과가 있으면 상단(좀 더 작은 높이)으로 이동
-              height: hasResults
-                  ? 130
-                  : MediaQuery.of(context).size.height * 0.4,
-              width: double.infinity,
-              alignment:
-              hasResults ? Alignment.topCenter : Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                mainAxisAlignment: hasResults
-                    ? MainAxisAlignment.end
-                    : MainAxisAlignment.center,
-                children: [
-                  // 검색 전에는 큰 타이틀, 검색 후에는 숨김
-                  if (!hasResults)
-                    const Text(
-                      "이름으로 대학교 찾기",
-                      style: TextStyle(
-                        fontSize: 35,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  const SizedBox(height: 10),
-
-                  // TextField + 검색 버튼 (버튼 로직은 기존 유지)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 60,
-                          child: TextField(
-                            controller: _nameController,
-                            style: const TextStyle(fontSize: 25),
-                            decoration: InputDecoration(
-                              hintText: '원하는 대학교를 검색해보세요',
-                              hintStyle: const TextStyle(
-                                color: Colors.black54,
-                                fontSize: 20,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(32.0),
-                                borderSide: const BorderSide(
-                                  width: 2,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(32.0),
-                                borderSide: BorderSide(
-                                  width: 2,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        height: 60,
-                        child: ElevatedButton(
-                          onPressed: _searchUniversity,
-                          style: ElevatedButton.styleFrom(
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(32.0),
-                            ),
-                            backgroundColor:
-                            Theme.of(context).primaryColor,
-                            fixedSize: const Size(100, 60),
-                          ),
-                          child: const Text(
-                            "검색",
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            // 바깥 터치 시 포커스 해제
+            GestureDetector(
+              onTap: () => FocusScope.of(context).unfocus(),
+              behavior: HitTestBehavior.deferToChild,
+              child: _buildBody(),
             ),
 
-            // 검색 결과 영역
-            const SizedBox(height: 20),
-            if (_isLoading)
-            // 로딩
-              const Center(child: CircularProgressIndicator())
-            else if (_error != null)
-            // 에러
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red, fontSize: 20),
-                    textAlign: TextAlign.center,
-                  ),
+            // 좌측 상단 아이콘
+            Positioned(
+              top: 5,
+              left: 10,
+              child: IconButton(
+                icon: Icon(
+                  _searched ? Icons.close : Icons.arrow_back,
+                  size: 50,
+                  color: Colors.black,
                 ),
-              )
-            else if (hasResults)
-              // 결과 리스트
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _searchResults.length,
-                    itemBuilder: (context, index) {
-                      final univ = _searchResults[index];
-
-                      // 뉴모피즘 컨테이너로 감싸기
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 8.0,
-                          horizontal: 16.0,
-                        ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.shade300,
-                                offset: const Offset(-4, -4),
-                                blurRadius: 6,
-                              ),
-                              BoxShadow(
-                                color: Colors.grey.shade600,
-                                offset: const Offset(4, 4),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                          child: UniversityListItem(
-                            university: univ,
-                            onToggleHeart: () => _toggleHeart(univ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                )
-              else
-              // 아직 아무것도 검색 안 했거나, 검색했으나 결과가 없을 때
-              // (결과가 정말 없는 경우도 hasResults=false이므로 여기로 들어옴)
-                const SizedBox.shrink(),
+                onPressed: _onBackOrClose,
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  /// 메인 바디: Stack 안에서 검색바와 리스트를 배치
+  Widget _buildBody() {
+    return Stack(
+      children: [
+        // 결과 리스트 (아래 쪽)
+        Positioned.fill(
+          top: 200,
+          // 검색 바가 아래 코드에서 top=200 이하 영역을 차지하므로,
+          // 리스트는 그 아래부터 채움
+          child: _buildResultWidget(),
+        ),
+
+        // 검색 바
+        // 검색 전에는 "중앙(높은 top)" -> 검색 후에는 "상단 (top=100)"
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+          left: 0,
+          right: 0,
+          // 검색 전이면 대략 화면 중간, 검색 후엔 top=100
+          top: _searched ? 100 : MediaQuery.of(context).size.height * 0.3,
+          child: _buildSearchBar(),
+        ),
+      ],
+    );
+  }
+
+  /// 검색바(텍스트필드 + 버튼)
+  Widget _buildSearchBar() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!_searched)
+          const Text(
+            '이름으로 대학교 찾기',
+            style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold),
+          ),
+        if (!_searched)
+          const SizedBox(height: 30),
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 300,
+              height: 60,
+              child: TextField(
+                controller: _nameController,
+                style: const TextStyle(fontSize: 25),
+                decoration: InputDecoration(
+                  hintText: '원하는 대학교를 검색해보세요',
+                  hintStyle: const TextStyle(color: Colors.black54, fontSize: 20),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(32.0),
+                    borderSide: const BorderSide(width: 2, color: Colors.grey),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(32.0),
+                    borderSide: BorderSide(
+                      width: 2,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                  contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 100,
+              height: 60,
+              child: ElevatedButton(
+                onPressed: _searchUniversity,
+                style: ElevatedButton.styleFrom(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(32.0),
+                  ),
+                  backgroundColor: Theme.of(context).primaryColor,
+                ),
+                child: const Text(
+                  '검색',
+                  style: TextStyle(fontSize: 20, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// 검색 결과 (로딩/에러/결과)
+  Widget _buildResultWidget() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 20)),
+      );
+    }
+    if (_searchResults.isEmpty) {
+      // 검색 전이거나 결과가 없을 때
+      return const SizedBox.shrink();
+      // 혹은 "검색 결과가 없습니다." 표시
+      // return const Center(child: Text('검색 결과가 없습니다.'));
+    }
+
+    // 실제 결과 리스트
+    return ListView.builder(
+      itemCount: _searchResults.length,
+      itemBuilder: (context, index) {
+        final univ = _searchResults[index];
+
+        // == 여기서 '이중박스'를 만들지 않고,
+        //    UniversityListItem 내에서만 Neumorphism(단일 박스) 적용
+        return UniversityListItem(
+          university: univ,
+          onToggleHeart: () => _toggleHeart(univ),
+        );
+      },
     );
   }
 }
