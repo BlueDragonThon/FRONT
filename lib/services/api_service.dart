@@ -88,6 +88,10 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
+
+    print(response.statusCode);
+    print(response.body);
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       return SignupResponse.fromJson(data);
@@ -111,6 +115,9 @@ class ApiService {
         'Authorization': 'Bearer $token', // 필요한 형태로 조정
       },
     );
+
+    print(response.statusCode);
+    print(response.body);
 
     // 응답 바이트를 UTF-8 문자열로 디코딩
     final String decodedBody = utf8.decode(response.bodyBytes);
@@ -148,6 +155,9 @@ class ApiService {
         'Authorization': 'Bearer $token',
       },
     );
+
+    print(response.statusCode);
+    print(response.body);
 
     if (response.statusCode != 200) {
       throw Exception('Failed to delete notification: ${response.statusCode}');
