@@ -1,5 +1,5 @@
 // search_univ.dart
-import 'package:bluedragonthon/services/search_service.dart';
+import 'package:bluedragonthon/services/search_api_service.dart';
 import 'package:bluedragonthon/utils/university_model.dart';
 import 'package:bluedragonthon/widgets/university_widgets.dart';
 import 'package:flutter/material.dart';
@@ -36,7 +36,7 @@ class _SearchUnivState extends State<SearchUniv> {
 
     try {
       // 대학 이름 검색 API: 세부 주소로 '/university/search' 전달
-      final results = await UniversityService.searchUniversity(searchText, '/api/collage');
+      final results = await UniversityService.searchUniversity(searchText, '/api/collage/name');
       setState(() {
         _searchResults = results;
       });

@@ -1,8 +1,9 @@
+import 'package:bluedragonthon/screens/search.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MobileMainScreen extends StatefulWidget {
-  const MobileMainScreen({Key? key}) : super(key: key);
+  const MobileMainScreen({super.key});
 
   @override
   State<MobileMainScreen> createState() => _MobileMainScreenState();
@@ -51,6 +52,14 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
     Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
 
+    // 화면 간 이동을 위한 함수
+  void _navigateTo(BuildContext context, Widget screen) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => screen),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,6 +69,16 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
           padding: const EdgeInsets.all(24.0),
           child: Column(
             children: [
+
+            ElevatedButton(onPressed: () => _navigateTo(context, const Search()), child: Text("임시 검색 페이지")),
+                const Text(
+                  '이름을 입력해주세요',
+                  style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 48),
               // 메인 화면 제목: 글자 크기 확대
               Text(
                 '메인 화면',
@@ -127,11 +146,11 @@ class ModernButtonWidget extends StatelessWidget {
   final double height;
 
   const ModernButtonWidget({
-    Key? key,
+    super.key,
     required this.text,
     required this.color,
     this.height = 120,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

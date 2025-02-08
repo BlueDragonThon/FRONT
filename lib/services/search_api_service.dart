@@ -1,5 +1,5 @@
-// university_service.dart
 import 'dart:convert';
+import 'package:bluedragonthon/utils/token_manager.dart';
 import 'package:bluedragonthon/utils/university_model.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -8,14 +8,31 @@ class UniversityService {
   // .env에서 BASE_URL 가져오기
   static String get baseUrl => dotenv.env['BASE_URL'] ?? '';
 
-  /// 검색 API 호출: endpoint는 '/university/search' 또는 '/course/search' 등으로 전달
-  static Future<List<University>> searchUniversity(
-      String searchText, String endpoint) async {
-    final Uri url = Uri.parse('$baseUrl$endpoint/$searchText');
+  /// 검색 API 호출: 요청 바디는 { "program": searchText, "page": 1 }
+  /// 헤더에 token을 포함하여 POST 방식으로 호출합니다.
+  static Future<List<University>> searchProgram(
 
-    // 실제 API 호출 예시 (주석 처리)
-    /*
-    final response = await http.get(url);
+      String searchText, String endpoint) async {
+    final String? token = await TokenManager.getToken();
+    if (token == null) {
+      throw Exception('No token found');
+    }
+    final Uri url = Uri.parse('$baseUrl$endpoint');
+
+    final body = jsonEncode({
+      "program": searchText,
+      "page": 1,
+    });
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: body,
+    );
+
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
       if (jsonResponse['isSuccess'] == true) {
@@ -27,70 +44,111 @@ class UniversityService {
     } else {
       throw Exception('에러 발생: ${response.statusCode}');
     }
-    */
-
-    // 더미 데이터 처리
-    await Future.delayed(const Duration(seconds: 2));
-    final Map<String, dynamic> dummyResponse = {
-      "isSuccess": true,
-      "code": "dummy",
-      "message": "dummy",
-      "result": {
-        "result": [
-          {
-            "id": 1,
-            "name": "중앙대학교",
-            "contactInfo": "010-2797-1090",
-            "address": "서울특별시 동작구",
-            "isHeart": false,
-            "program": ["소프트웨어학부", "경영학부"]
-          },
-          {
-            "id": 2,
-            "name": "서울대학교",
-            "contactInfo": "010-1111-2222",
-            "address": "서울특별시 관악구",
-            "isHeart": true,
-            "program": ["컴퓨터공학", "의학"]
-          }
-        ],
-        "pageCount": 1
-      }
-    };
-
-    if (dummyResponse['isSuccess'] == true) {
-      final List<dynamic> results = dummyResponse['result']['result'];
-      return results.map((data) => University.fromJson(data)).toList();
-    } else {
-      throw Exception(dummyResponse['message'] ?? '검색에 실패했습니다.');
-    }
   }
 
-  /// 하트 토글 API 호출: 각 검색 페이지에서 사용
-  static Future<bool> toggleHeart(int id, bool currentState) async {
-    // 실제 API 호출 예시 (주석 처리)
-    /*
-    const String userToken = 'dummy-token';
-    final Uri url = Uri.parse('$baseUrl/university/heart-toggle');
+  static Future<List<University>> searchUniversity(
+      String searchText, String endpoint) async {
+    final String? token = await TokenManager.getToken();
+    if (token == null) {
+      throw Exception('No token found');
+    }
+    final Uri url = Uri.parse('$baseUrl$endpoint');
+
+    final body = jsonEncode({
+      "program": searchText,
+      "page": 1,
+    });
+
     final response = await http.post(
       url,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $userToken',
+        'Authorization': 'Bearer $token',
       },
-      body: jsonEncode({
-        'id': id,
-        'isHeart': !currentState,
-      }),
+      body: body,
     );
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+      if (jsonResponse['isSuccess'] == true) {
+        final List<dynamic> results = jsonResponse['result']['result'];
+        return results.map((data) => University.fromJson(data)).toList();
+      } else {
+        throw Exception(jsonResponse['message'] ?? '검색에 실패했습니다.');
+      }
+    } else {
+      throw Exception('에러 발생: ${response.statusCode}');
+    }
+  }
+
+  /// 하트 토글 API 호출: 사용자 토큰을 id로 전송
+  static Future<bool> toggleHeart(int universityId, bool currentState) async {
+    final String? token = await TokenManager.getToken();
+    if (token == null) {
+      throw Exception('No token found');
+    }
+    final Uri url = Uri.parse('$baseUrl/api/colleage/like');
+
+    final body = jsonEncode({
+      "collegeId": universityId,
+    });
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: body,
+    );
+
     if (response.statusCode == 200) {
       return !currentState;
     } else {
       throw Exception('하트 요청 실패: ${response.statusCode}');
     }
-    */
-    // 더미 처리
-    await Future.delayed(const Duration(milliseconds: 500));
-    return !currentState;
+  }
+
+  /// 위치 데이터 전송 API 호출
+  /// 요청 바디:
+  /// {
+  ///   "id": <사용자 토큰>,
+  ///   "name": "string",
+  ///   "age": 100,
+  ///   "coordinate": {"acr": <acr 값>, "dwn": <dwn 값>}
+  /// }
+  static Future<dynamic> sendLocationData({
+    required double acr,
+    required double dwn,
+    int page = 0,
+  }) async {
+    final String? token = await TokenManager.getToken();
+    if (token == null) {
+      throw Exception('No token found');
+    }
+
+    final Uri url = Uri.parse('$baseUrl/api/colleage/search');
+
+    final body = jsonEncode({
+      "id": token,
+      "name": "string",
+      "age": 100,
+      "coordinate": {
+        "acr": acr,
+        "dwn": dwn,
+      }
+    });
+
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Location API error: ${response.statusCode}');
+    }
   }
 }
