@@ -1,5 +1,5 @@
 // search_univ.dart
-import 'package:bluedragonthon/services/search_service.dart';
+import 'package:bluedragonthon/services/search_api_service.dart';
 import 'package:bluedragonthon/utils/university_model.dart';
 import 'package:bluedragonthon/widgets/university_widgets.dart';
 import 'package:flutter/material.dart';
