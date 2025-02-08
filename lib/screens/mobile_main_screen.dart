@@ -74,17 +74,16 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
     HapticFeedback.mediumImpact();
     switch (index) {
       case 0:
-      // Search 화면 (Hero 삭제됨)
+      // Search 화면
         _navigateTo(context, const Search());
         break;
       case 1:
         _navigateTo(context, const MobileAlertScreen());
         break;
       case 2:
+      // 커뮤니티
         break;
       case 3:
-      //navigateTo(context, const LikesList());
-       // break;
     }
   }
 
@@ -110,19 +109,27 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                   ),
                 ),
               ),
-              // (2) Hero 도착 지점 (왼쪽 상단, 작게)
+              // (2) 좌측 상단에 Hero로 연결될 작은 원(혹은 0 크기)
+              //     스플래시의 커다란 원이 여기로 날아와서 사라지는 느낌
               Positioned(
-                top: 60,
-                left: 20,
+                top: 0,
+                left: 0,
                 child: Hero(
                   tag: 'transitionCircle',
-                  // flightShuttleBuilder 없음
+                  flightShuttleBuilder: (flightContext, animation, flightDirection,
+                      fromHeroContext, toHeroContext) {
+                    if (flightDirection == HeroFlightDirection.push) {
+                      return fromHeroContext.widget;
+                    } else {
+                      return toHeroContext.widget;
+                    }
+                  },
                   child: Container(
-                    width: 80,
-                    height: 80,
+                    width: 0,
+                    height: 0,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white24,
+                      color: Colors.transparent,
                     ),
                   ),
                 ),
@@ -164,6 +171,7 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                       ),
                       const SizedBox(height: 20),
 
+                      // 사용자 이름
                       if (userName != null && userName!.isNotEmpty)
                         AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 300),
@@ -179,6 +187,7 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                         ),
                       const SizedBox(height: 24),
 
+                      // 2x2 버튼 그리드
                       GridView.count(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -197,6 +206,8 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                         }),
                       ),
                       const SizedBox(height: 40),
+
+                      // 정보 초기화 버튼
                       SizedBox(
                         width: 320,
                         height: 80,
@@ -232,7 +243,7 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
   }
 }
 
-/// (기존) 뉴모피즘 + 그림자 강조
+/// 뉴모피즘 버튼 예시
 class _NeumorphicButton extends StatelessWidget {
   final String text;
   final IconData icon;

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // 진동 사용시 필요
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'mobile_age_select_screen.dart'; // 나이 화면
 
@@ -24,20 +24,6 @@ class _MobileNameInputScreenState extends State<MobileNameInputScreen> {
   Future<void> _saveName() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('userName', _nameController.text.trim());
-  }
-
-  // "다음" 버튼 → 나이 선택 화면으로 이동 (Push + Fade)
-  void _goToAgeSelectScreen() {
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, animation, __) => const MobileAgeSelectScreen(),
-        transitionsBuilder: (_, animation, __, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 300),
-      ),
-    );
   }
 
   void _onNext() async {
@@ -90,15 +76,6 @@ class _MobileNameInputScreenState extends State<MobileNameInputScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                /*
-                const Text(
-                  '환영합니다!',
-                  style: TextStyle(
-                    fontSize: 60,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 50),*/
                 const Text(
                   '이름을 입력해주세요',
                   style: TextStyle(
@@ -114,7 +91,7 @@ class _MobileNameInputScreenState extends State<MobileNameInputScreen> {
                   style: const TextStyle(fontSize: 25),
                   decoration: InputDecoration(
                     hintText: '예) 홍길동',
-                    hintStyle: TextStyle(
+                    hintStyle: const TextStyle(
                       color: Colors.black54,
                       fontSize: 25,
                     ),
@@ -140,7 +117,7 @@ class _MobileNameInputScreenState extends State<MobileNameInputScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // Hero로 연결된 원형 버튼
+                // Hero로 연결된 원형 버튼 (절대 수정 X)
                 Hero(
                   tag: 'transitionCircle',
                   child: SizedBox(
@@ -151,7 +128,7 @@ class _MobileNameInputScreenState extends State<MobileNameInputScreen> {
                       style: ElevatedButton.styleFrom(
                         shape: const CircleBorder(),
                         backgroundColor: Theme.of(context).primaryColor,
-                        elevation: 0, // 그림자 제거
+                        elevation: 0,
                       ),
                       child: const Icon(
                         Icons.arrow_forward_ios_rounded,
