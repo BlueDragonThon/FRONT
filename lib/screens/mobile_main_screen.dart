@@ -1,9 +1,9 @@
-import 'package:bluedragonthon/screens/likes_list.dart';
+import 'package:bluedragonthon/screens/mobile_lecture_review.dart';
+import 'package:bluedragonthon/screens/mobile_like_univ_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// 나머지 import
 import 'search.dart';
 import 'reminder.dart';
 import 'mobile_alart_screen.dart';
@@ -19,35 +19,33 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
   String? userName;
   int? userAge;
   String? userLocation;
+
+  // --------------------
+  // "큰 글자 모드" 여부
+  // --------------------
   bool _isLargeText = false;
 
-  final List<String> buttonTexts = [
-    '대학 찾기',
-    '알리미',
-    '커뮤니티',
-    '나의\n관심 대학',
-  ];
-
-  final List<Color> buttonColors = [
-    Color(0xFFFFC8D0),
-    Color(0xFFFFF5B3),
-    Color(0xFFB7FFBF),
-    Color(0xFFB7EEFF),
-  ];
-
-  final List<IconData> buttonIcons = [
-    Icons.search,
-    Icons.notifications,
-    Icons.groups,
-    Icons.favorite,
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserData();
+  // --------------------
+  // 공유 함수: "큰 글자 모드" 로드
+  // --------------------
+  Future<void> _loadLargeTextSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isLargeText = prefs.getBool('isLargeText') ?? false;
+    });
   }
 
+  // --------------------
+  // 공유 함수: "큰 글자 모드" 저장
+  // --------------------
+  Future<void> _saveLargeTextSetting(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLargeText', value);
+  }
+
+  // --------------------
+  // 유저 정보 로드
+  // --------------------
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -57,34 +55,54 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
     });
   }
 
+  // --------------------
+  // 유저 데이터 초기화
+  // --------------------
   Future<void> _resetData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
     Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
 
-  void _navigateTo(BuildContext context, Widget screen) {
-    Navigator.push(
+  // --------------------
+  // 화면 이동 함수
+  // --------------------
+  void _navigateTo(BuildContext context, Widget screen) async {
+    // Navigator.push를 await 해 두면, 뒤로 돌아왔을 때 _isLargeText 갱신 가능
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => screen),
     );
+    // 뒤로 돌아온 직후에 다시 로드하여, 다른 화면에서 바뀐 상태를 반영
+    _loadLargeTextSetting();
   }
 
+  // --------------------
+  // 메인 버튼 탭했을 때
+  // --------------------
   void _onButtonTap(int index) {
     HapticFeedback.mediumImpact();
     switch (index) {
       case 0:
-      // Search 화면
-        _navigateTo(context, const Search());
+        _navigateTo(context, const Search()); // <-- Search로 이동
         break;
       case 1:
         _navigateTo(context, const MobileAlertScreen());
         break;
       case 2:
-      // 커뮤니티
+        _navigateTo(context, const MobileLectureReviewScreen());
         break;
       case 3:
+        _navigateTo(context, const MobileLikeUnivListScreen());
+        break;
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+    _loadLargeTextSetting(); // 큰 글자 모드 설정 불러오기
   }
 
   @override
@@ -109,15 +127,19 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                   ),
                 ),
               ),
-              // (2) 좌측 상단에 Hero로 연결될 작은 원(혹은 0 크기)
-              //     스플래시의 커다란 원이 여기로 날아와서 사라지는 느낌
+              // (2) Hero 공간(스플래시와의 연결용)
               Positioned(
                 top: 0,
                 left: 0,
                 child: Hero(
                   tag: 'transitionCircle',
-                  flightShuttleBuilder: (flightContext, animation, flightDirection,
-                      fromHeroContext, toHeroContext) {
+                  flightShuttleBuilder: (
+                      flightContext,
+                      animation,
+                      flightDirection,
+                      fromHeroContext,
+                      toHeroContext,
+                      ) {
                     if (flightDirection == HeroFlightDirection.push) {
                       return fromHeroContext.widget;
                     } else {
@@ -160,6 +182,8 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                               setState(() {
                                 _isLargeText = value;
                               });
+                              // 스위치가 변경될 때 SharedPreferences에 즉시 저장
+                              _saveLargeTextSetting(value);
                             },
                             inactiveThumbColor: Colors.white,
                             inactiveTrackColor: Colors.grey,
@@ -187,7 +211,7 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                         ),
                       const SizedBox(height: 24),
 
-                      // 2x2 버튼 그리드
+                      // 2 x 2 버튼 그리드
                       GridView.count(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -195,7 +219,27 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
                         mainAxisSpacing: 20,
                         crossAxisSpacing: 20,
                         childAspectRatio: 0.7,
-                        children: List.generate(buttonTexts.length, (index) {
+                        children: List.generate(4, (index) {
+                          // 버튼 정보
+                          final List<String> buttonTexts = [
+                            '대학 찾기',
+                            '알리미',
+                            '수강후기',
+                            '나의\n관심 대학',
+                          ];
+                          final List<Color> buttonColors = [
+                            const Color(0xFFFFC8D0),
+                            const Color(0xFFFFF5B3),
+                            const Color(0xFFB7FFBF),
+                            const Color(0xFFB7EEFF),
+                          ];
+                          final List<IconData> buttonIcons = [
+                            Icons.search,
+                            Icons.notifications,
+                            Icons.groups,
+                            Icons.favorite,
+                          ];
+
                           return _NeumorphicButton(
                             text: buttonTexts[index],
                             icon: buttonIcons[index],
@@ -243,7 +287,6 @@ class _MobileMainScreenState extends State<MobileMainScreen> {
   }
 }
 
-/// 뉴모피즘 버튼 예시
 class _NeumorphicButton extends StatelessWidget {
   final String text;
   final IconData icon;
@@ -256,8 +299,8 @@ class _NeumorphicButton extends StatelessWidget {
     required this.text,
     required this.icon,
     required this.color,
-    this.onTap,
     required this.fontSize,
+    this.onTap,
   });
 
   @override

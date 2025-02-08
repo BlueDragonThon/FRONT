@@ -3,35 +3,37 @@ import 'package:flutter/services.dart';
 import 'package:bluedragonthon/services/api_service.dart';
 import 'package:bluedragonthon/utils/token_manager.dart';
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart'; // 추가
+import 'package:shared_preferences/shared_preferences.dart';
 
-class MobileAlertScreen extends StatefulWidget {
-  const MobileAlertScreen({Key? key}) : super(key: key);
+class MobileLikeUnivListScreen extends StatefulWidget {
+  const MobileLikeUnivListScreen({Key? key}) : super(key: key);
 
   @override
-  State<MobileAlertScreen> createState() => _MobileAlertScreenState();
+  State<MobileLikeUnivListScreen> createState() => _MobileLikeUnivListScreenState();
 }
 
-class _MobileAlertScreenState extends State<MobileAlertScreen> {
-  // --------------------------
-  // "큰 글자 모드" 여부
-  // --------------------------
+class _MobileLikeUnivListScreenState extends State<MobileLikeUnivListScreen> {
   bool _isLargeText = false;
 
-  List<NotificationItem> _notifications = [];
+  // 찜한 대학 목록
+  List<LikeUnivItem> _likeUnivs = [];
   bool _isLoading = false;
   String _errorMessage = '';
+
+  // 페이지(필요 시)
+  int _currentPage = 1;
+  int _totalPages = 1; // 서버에서 pageCount 받아오면 사용
 
   @override
   void initState() {
     super.initState();
     _loadLargeTextSetting();
-    _fetchNotifications();
+    _fetchLikeUnivs(page: _currentPage);
   }
 
-  // --------------------------
-  // SharedPreferences에서 "큰 글자 모드" 불러오기
-  // --------------------------
+  // --------------------
+  // "큰 글자 모드" 로드
+  // --------------------
   Future<void> _loadLargeTextSetting() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -39,23 +41,27 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
     });
   }
 
-  // --------------------------
+  // --------------------
   // "큰 글자 모드" 저장
-  // --------------------------
+  // --------------------
   Future<void> _saveLargeTextSetting(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLargeText', value);
   }
 
-  Future<void> _fetchNotifications() async {
+  // --------------------
+  // 찜한 대학 목록 불러오기
+  // --------------------
+  Future<void> _fetchLikeUnivs({required int page}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
     try {
-      final List<NotificationItem> data = await ApiService.getNotifications();
+      final response = await ApiService.getLikeUnivList(page);
       setState(() {
-        _notifications = data;
+        _likeUnivs = response.result.result;
+        _totalPages = response.result.pageCount;
         _isLoading = false;
       });
     } catch (e) {
@@ -66,11 +72,15 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
     }
   }
 
-  Future<void> _deleteNotification(int notificationId) async {
+  // --------------------
+  // 찜 해제
+  // --------------------
+  Future<void> _deleteLikeUniv(int collegeId) async {
     try {
-      await ApiService.deleteNotification(notificationId);
+      await ApiService.deleteLikeUniv(collegeId);
+      // 서버에서 성공 응답을 받으면 목록에서 제거
       setState(() {
-        _notifications.removeWhere((notif) => notif.id == notificationId);
+        _likeUnivs.removeWhere((item) => item.id == collegeId);
       });
     } catch (e) {
       setState(() {
@@ -81,7 +91,6 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 기존보다 글자 조금 더 크게
     final double labelFontSize = _isLargeText ? 30 : 22;
 
     return Scaffold(
@@ -91,8 +100,8 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFE3E5ED), // 연한 회색
-              Color(0xFFDADCE2), // 조금 더 진한 회색
+              Color(0xFFE3E5ED),
+              Color(0xFFDADCE2),
             ],
           ),
         ),
@@ -120,7 +129,6 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
                       setState(() {
                         _isLargeText = value;
                       });
-                      // 스위치 상태가 바뀔 때 SharedPreferences에 저장
                       _saveLargeTextSetting(value);
                     },
                     inactiveThumbColor: Colors.white,
@@ -133,12 +141,12 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
               ),
               const SizedBox(height: 10),
 
-              // 알림 목록/에러/로딩/빈 목록
+              // 메인 컨텐츠
               Expanded(
                 child: _buildContentArea(),
               ),
 
-              // 아래 뉴모피즘 뒤로가기 버튼
+              // 아래쪽: 뒤로가기 버튼
               _buildBackButton(context),
             ],
           ),
@@ -168,10 +176,9 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
       );
     }
 
-    if (_notifications.isEmpty) {
-      // "등록된 알림이 없습니다." 가운데 표시
+    if (_likeUnivs.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _fetchNotifications,
+        onRefresh: () => _fetchLikeUnivs(page: _currentPage),
         child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
@@ -180,7 +187,7 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Center(
                   child: Text(
-                    '등록된 알림이 없습니다.',
+                    '찜한 대학이 없습니다.',
                     style: TextStyle(fontSize: _isLargeText ? 26 : 18),
                   ),
                 ),
@@ -192,31 +199,29 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: _fetchNotifications,
+      onRefresh: () => _fetchLikeUnivs(page: _currentPage),
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        itemCount: _notifications.length,
+        itemCount: _likeUnivs.length,
         itemBuilder: (context, index) {
-          final notification = _notifications[index];
-          return _NeumorphicNotificationCard(
-            notification: notification,
+          final univItem = _likeUnivs[index];
+          return _NeumorphicLikeUnivCard(
+            univItem: univItem,
             isLargeText: _isLargeText,
-            onDelete: () => _deleteNotification(notification.id),
+            onDelete: () => _deleteLikeUniv(univItem.id),
           );
         },
       ),
     );
   }
 
-  /// 뉴모피즘 뒤로가기 버튼
   Widget _buildBackButton(BuildContext context) {
-    final double buttonHeight = 70; // 살짝 높임
+    final double buttonHeight = 70;
     final double buttonWidth = MediaQuery.of(context).size.width * 0.85;
     final double iconSize = _isLargeText ? 32 : 24;
     final double textSize = _isLargeText ? 28 : 20;
 
-    // 뉴모피즘 메인 배경색
     const baseColor = Color(0xFFE3E5ED);
 
     return Container(
@@ -265,31 +270,28 @@ class _MobileAlertScreenState extends State<MobileAlertScreen> {
   }
 }
 
-/// 뉴모피즘 카드 + 삭제 버튼 (오른쪽 중간, 빨간색, 크게)
-class _NeumorphicNotificationCard extends StatelessWidget {
-  final NotificationItem notification;
+/// 뉴모피즘 카드 (찜 해제 버튼 포함)
+class _NeumorphicLikeUnivCard extends StatelessWidget {
+  final LikeUnivItem univItem;
   final bool isLargeText;
   final VoidCallback onDelete;
 
-  const _NeumorphicNotificationCard({
+  const _NeumorphicLikeUnivCard({
     Key? key,
-    required this.notification,
+    required this.univItem,
     required this.isLargeText,
     required this.onDelete,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // 뉴모피즘 배경색
     const baseColor = Color(0xFFE3E5ED);
-    // 글자 크기를 조금 더 키우고, 큰글씨 모드에서는 더 크게
     final double contentFontSize = isLargeText ? 26.0 : 18.0;
-    final double iconSize = contentFontSize + 8; // 삭제 아이콘 크기
+    final double iconSize = contentFontSize + 8;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
-      // height 제거 → 자동 높이로 늘어남
       decoration: BoxDecoration(
         color: baseColor,
         borderRadius: BorderRadius.circular(20),
@@ -309,35 +311,48 @@ class _NeumorphicNotificationCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 왼쪽: 알림 내용
+          // 왼쪽: 대학 정보
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  notification.title,
+                  univItem.name,
                   style: TextStyle(
-                    fontSize: contentFontSize + 2, // 제목은 살짝 더 크게
+                    fontSize: contentFontSize + 2,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  notification.content,
+                  '총장: ${univItem.headmaster}',
+                  style: TextStyle(fontSize: contentFontSize),
+                ),
+                Text(
+                  '연락처: ${univItem.contactInfo}',
+                  style: TextStyle(fontSize: contentFontSize),
+                ),
+                Text(
+                  '주소: ${univItem.address}',
                   style: TextStyle(fontSize: contentFontSize),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  notification.date,
+                  '개설 프로그램: ${univItem.program.join(", ")}',
+                  style: TextStyle(fontSize: contentFontSize),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  univItem.favorites ? '★ 찜한 상태' : '찜 해제됨',
                   style: TextStyle(
-                    fontSize: contentFontSize - 2,
-                    color: Colors.grey,
+                    fontSize: contentFontSize,
+                    color: univItem.favorites ? Colors.blue : Colors.grey,
                   ),
                 ),
               ],
             ),
           ),
-          // 오른쪽: 삭제 버튼 (중앙 정렬)
+          // 오른쪽: 찜 해제 버튼
           Container(
             margin: const EdgeInsets.only(left: 10),
             alignment: Alignment.center,
@@ -363,7 +378,7 @@ class _NeumorphicNotificationCard extends StatelessWidget {
                   ],
                 ),
                 child: Icon(
-                  Icons.delete,
+                  Icons.delete_forever,
                   size: iconSize,
                   color: Colors.white,
                 ),
