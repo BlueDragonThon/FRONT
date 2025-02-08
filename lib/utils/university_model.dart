@@ -1,5 +1,11 @@
-import 'dart:ffi';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:bluedragonthon/services/search_api_service.dart'; // 예: 서버통신 가정
 
+// (예시용) 대학교 모델
 class University {
   final int id;
   final String name;
